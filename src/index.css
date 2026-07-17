@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Bebas+Neue&family=Outfit:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-deep: var(--gold-deep);
+  --color-forest: var(--forest);
+  --color-forest-deep: var(--forest-deep);
+  --color-cream: var(--cream);
+  --color-charcoal: var(--charcoal);
+  --color-parchment: var(--parchment);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-surface: var(--surface);
+  --color-border-light: var(--border-light);
+  --color-rose-deep: var(--rose-deep);
+  --color-page: var(--page);
+
+  --font-serif: 'Cormorant Garamond', serif;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-sans: 'Outfit', sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Accent colors (unchanged — hero slides, labels, prices) */
+  --gold: oklch(0.72 0.11 78);
+  --gold-soft: oklch(0.62 0.09 78);
+  --gold-deep: oklch(0.52 0.10 65);
+  --forest: oklch(0.30 0.045 155);
+  --forest-deep: oklch(0.17 0.035 155);
+  --cream: oklch(0.94 0.025 92);
+  --charcoal: oklch(0.12 0 0);
+  --rose-deep: oklch(0.48 0.14 15);
+
+  /* Shop / content pages: white bg + black text */
+  --page: #ffffff;
+  --parchment: #ffffff;
+  --surface: #ffffff;
+  --ink: #000000;
+  --ink-muted: #4a4a4a;
+  --border-light: #e5e5e5;
+
+  /* Dark shell (hero only via slide classes) */
+  --background: oklch(0.11 0.012 155);
+  --foreground: var(--cream);
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --primary: var(--gold);
+  --primary-foreground: var(--charcoal);
+  --secondary: #f5f5f5;
+  --secondary-foreground: #000000;
+  --muted: #f5f5f5;
+  --muted-foreground: #4a4a4a;
+  --accent: var(--gold);
+  --accent-foreground: var(--charcoal);
+  --destructive: oklch(0.52 0.18 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: var(--gold);
+
+  --gradient-hero: linear-gradient(165deg, oklch(0.22 0.04 155) 0%, oklch(0.12 0.03 155) 55%, oklch(0.09 0.02 155) 100%);
+  --gradient-gold: linear-gradient(135deg, oklch(0.78 0.12 78), oklch(0.58 0.11 62));
+  --shadow-gold: 0 20px 60px -20px oklch(0.72 0.11 78 / 0.4);
+  --shadow-bottle: 0 40px 80px -20px oklch(0 0 0 / 0.55);
+}
+
+@layer base {
+  * { border-color: var(--color-border); box-sizing: border-box; }
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+  body {
+    background-color: var(--page);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  img { max-width: 100%; }
+  h1, h2, h3, h4 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .font-display { font-family: var(--font-display); letter-spacing: 0.04em; }
+}
+
+@layer utilities {
+  .text-gold { color: var(--gold); }
+  .bg-gold { background-color: var(--gold); }
+  .bg-forest { background-color: var(--forest); }
+  .bg-forest-deep { background-color: var(--forest-deep); }
+  .bg-charcoal { background-color: var(--charcoal); }
+  .text-cream { color: var(--cream); }
+  .border-gold { border-color: var(--gold); }
+  .bg-gradient-hero { background: var(--gradient-hero); }
+  .bg-gradient-gold { background: var(--gradient-gold); }
+  .shadow-gold { box-shadow: var(--shadow-gold); }
+  .shadow-bottle { filter: drop-shadow(var(--shadow-bottle)); }
+  .bg-page { background-color: var(--page); }
+  .text-ink { color: var(--ink); }
+  .text-ink-muted { color: var(--ink-muted); }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+
+  @keyframes float-bottle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-18px); }
+  }
+  .animate-float { animation: float-bottle 6s ease-in-out infinite; }
+
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.06); }
+  }
+  .animate-glow { animation: glow-pulse 5s ease-in-out infinite; }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in { animation: fade-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

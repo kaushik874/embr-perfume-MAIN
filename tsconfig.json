@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/pages/**/*",
+    "src/components/site/**/*",
+    "src/components/layout/**/*",
+    "src/contexts/**/*",
+    "src/hooks/use-reveal.ts",
+    "src/lib/**/*",
+    "src/components/ui/button.tsx",
+    "src/components/ui/input.tsx",
+    "src/components/ui/label.tsx",
+    "src/components/ui/sheet.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "server"]
+}

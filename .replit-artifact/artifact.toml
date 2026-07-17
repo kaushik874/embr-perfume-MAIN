@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Embr Perfume"
+version = "1.0.0"
+id = "artifacts/embr-perfume"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25759
+
+[services.development]
+run = "pnpm --filter @workspace/embr-perfume run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/embr-perfume", "run", "build" ]
+publicDir = "artifacts/embr-perfume/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25759"
+BASE_PATH = "/"
