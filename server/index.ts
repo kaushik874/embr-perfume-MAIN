@@ -155,7 +155,7 @@ app.use("/api/admin", requireAuth, requireAdmin, analyticsAdminRoutes);
 app.use("/api/admin", requireAuth, requireAdmin, adminRoutes);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.resolve(__dirname, "../public");
+const publicDir = path.resolve(__dirname, "../dist/public");
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(publicDir));
