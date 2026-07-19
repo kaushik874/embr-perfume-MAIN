@@ -62,8 +62,8 @@ function getRazorpay() {
   });
 }
 
-router.get("/mine", requireAuth, (req, res) => {
-  const orders = db
+router.get("/mine", requireAuth, async (req, res) => {
+  const orders = await db
     .prepare(
       `SELECT id, status, total_paise, razorpay_order_id, razorpay_payment_id, created_at,
               shipping_name, shipping_email, shipping_phone, shipping_address,
@@ -73,7 +73,7 @@ router.get("/mine", requireAuth, (req, res) => {
     .all(req.user!.userId) as any[];
 
   for (const order of orders) {
-    order.items = db
+    order.items = await db
       .prepare(
         `SELECT oi.quantity, oi.price_paise as price_at_time, p.name, p.slug, p.image
          FROM order_items oi
@@ -96,10 +96,10 @@ router.post("/guest-checkout", async (req, res) => {
   const { items, shipping } = parsed.data;
 
   let totalPaise: number;
-  let lineItems: ReturnType<typeof buildOrderLines>["lineItems"];
+  let lineItems: Awaited<ReturnType<typeof buildOrderLines>>["lineItems"];
 
   try {
-    const built = buildOrderLines(items);
+    const built = await buildOrderLines(items);
     totalPaise = built.totalPaise;
     lineItems = built.lineItems;
   } catch (err) {
@@ -109,7 +109,7 @@ router.post("/guest-checkout", async (req, res) => {
     return;
   }
 
-  const user = ensureUserFromShipping({
+  const user = await ensureUserFromShipping({
     name: shipping.name,
     email: shipping.email,
     phone: shipping.phone,
@@ -118,7 +118,7 @@ router.post("/guest-checkout", async (req, res) => {
   let addressId: number | undefined;
   if (shipping.saveAddress !== false) {
     try {
-      addressId = saveCustomerAddress(user.id, shipping, {
+      addressId = await saveCustomerAddress(user.id, shipping, {
         existingAddressId: shipping.addressId,
         setDefault: shipping.setDefault,
         updateExisting: shipping.updateAddress === true,
@@ -133,14 +133,14 @@ router.post("/guest-checkout", async (req, res) => {
     addressId = shipping.addressId;
   }
 
-  const orderId = createOrderRecord(user.id, totalPaise, lineItems, {
+  const orderId = await createOrderRecord(user.id, totalPaise, lineItems, {
     ...shipping,
     addressId,
   });
   setAuthCookie(res, user.id, user.email);
 
   if (!razorpayEnabled()) {
-    db.prepare(
+    await db.prepare(
       `UPDATE orders SET status = 'paid', razorpay_payment_id = 'demo' WHERE id = ?`,
     ).run(orderId);
 
@@ -163,7 +163,7 @@ router.post("/guest-checkout", async (req, res) => {
       notes: { orderId: String(orderId) },
     });
 
-    db.prepare(
+    await db.prepare(
       "UPDATE orders SET razorpay_order_id = ? WHERE id = ?",
     ).run(rzOrder.id, orderId);
 
@@ -191,7 +191,7 @@ const markPaidSchema = z.object({
 // This endpoint is only for confirming payment on the client side AFTER
 // Razorpay callback. It requires both payment_id AND order_id to match.
 // Real signature verification is enforced separately via /orders/verify.
-router.post("/mark-paid", requireAuth, (req, res) => {
+router.post("/mark-paid", requireAuth, async (req, res) => {
   const parsed = markPaidSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -206,7 +206,7 @@ router.post("/mark-paid", requireAuth, (req, res) => {
     return;
   }
 
-  const order = db
+  const order = await db
     .prepare("SELECT id, user_id, status, razorpay_order_id FROM orders WHERE id = ?")
     .get(orderId) as { id: number; user_id: number; status: string; razorpay_order_id: string | null } | undefined;
 
@@ -227,7 +227,7 @@ router.post("/mark-paid", requireAuth, (req, res) => {
     return;
   }
 
-  db.prepare(
+  await db.prepare(
     `UPDATE orders SET status = 'paid', razorpay_payment_id = ? WHERE id = ?`,
   ).run(razorpay_payment_id, orderId);
 
@@ -241,7 +241,7 @@ const verifySchema = z.object({
   razorpay_signature: z.string(),
 });
 
-router.post("/verify", requireAuth, (req, res) => {
+router.post("/verify", requireAuth, async (req, res) => {
   const parsed = verifySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -251,7 +251,7 @@ router.post("/verify", requireAuth, (req, res) => {
   const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } =
     parsed.data;
 
-  const order = db
+  const order = await db
     .prepare("SELECT id, user_id, status FROM orders WHERE id = ?")
     .get(orderId) as { id: number; user_id: number; status: string } | undefined;
 
@@ -276,7 +276,7 @@ router.post("/verify", requireAuth, (req, res) => {
     return;
   }
 
-  db.prepare(
+  await db.prepare(
     `UPDATE orders SET status = 'paid', razorpay_payment_id = ?, razorpay_order_id = ? WHERE id = ?`,
   ).run(razorpay_payment_id, razorpay_order_id, orderId);
 

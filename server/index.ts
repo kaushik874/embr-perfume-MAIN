@@ -50,11 +50,6 @@ import analyticsAdminRoutes from "./routes/analytics-admin.js";
 import { startAutomaticBackups } from "./lib/backups.js";
 import { startOrderExpiryJob } from "./lib/orders.js";
 
-initDb();
-runMigrations();
-startAutomaticBackups();
-startOrderExpiryJob();
-
 const app = express();
 const port = Number(process.env.PORT) || 3001;
 const clientUrl = process.env.CLIENT_URL ?? "http://localhost:5173";
@@ -155,22 +150,44 @@ app.use("/api/admin", requireAuth, requireAdmin, analyticsAdminRoutes);
 app.use("/api/admin", requireAuth, requireAdmin, adminRoutes);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// In production: compiled server is at dist/server/index.js
+// Frontend build is at dist/public/ (from vite build outDir)
+// Uploaded images live in public/uploads/ (project root) - served separately above
 const publicDir = path.resolve(__dirname, "../public");
+// Also resolve the source uploads dir for when images are stored there (not in dist)
+const sourceUploadsDir = path.resolve(process.cwd(), "public", "uploads");
 
 if (process.env.NODE_ENV === "production") {
+  // Serve uploaded files from the project-root public/uploads directory
+  // (In case uploads are not included in the dist/public build)
+  app.use("/uploads", express.static(sourceUploadsDir));
+  // Serve frontend build
   app.use(express.static(publicDir));
   app.get("*", (_req, res) => {
     res.sendFile(path.join(publicDir, "index.html"));
   });
 }
 
-app.listen(port, () => {
-  console.log(`Embr API running on http://localhost:${port}`);
-});
 
 // Global error handler — must be last middleware, catches all unhandled errors
 import type { NextFunction, Request, Response } from "express";
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error("[Unhandled Error]", err.message);
   res.status(500).json({ error: "An unexpected error occurred." });
+});
+
+async function startServer() {
+  await initDb();
+  await runMigrations();
+  startAutomaticBackups();
+  startOrderExpiryJob();
+
+  app.listen(port, () => {
+    console.log(`Embr API running on http://localhost:${port}`);
+  });
+}
+
+startServer().catch((err) => {
+  console.error("[Startup Error]", err);
+  process.exit(1);
 });

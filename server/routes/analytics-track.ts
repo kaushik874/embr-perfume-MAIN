@@ -5,7 +5,7 @@ import { isBot, getDevice, getBrowser, getOS, getReferrerSource, getClientIp } f
 const router = Router();
 
 // ── POST /api/track  — record a page view ─────────────────────────────────
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const ua = req.headers["user-agent"] || "";
     if (isBot(ua)) {
@@ -35,7 +35,7 @@ router.post("/", (req, res) => {
     const pagePath = page.substring(0, 500);
 
     // Upsert visitor
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO analytics_visitors (visitor_id, first_seen, last_seen, visit_count, device, browser, os, ip)
       VALUES (?, ?, ?, 1, ?, ?, ?, ?)
       ON CONFLICT(visitor_id) DO UPDATE SET
@@ -48,7 +48,7 @@ router.post("/", (req, res) => {
 
     // Upsert session
     if (isNewSession) {
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO analytics_sessions
           (session_id, visitor_id, started_at, last_seen, landing_page, referrer, referrer_source, pages_viewed)
         VALUES (?, ?, ?, ?, ?, ?, ?, 1)
@@ -56,7 +56,7 @@ router.post("/", (req, res) => {
       `).run(sessionId, visitorId, now, now, pagePath, referrer || "", refSource);
     } else {
       // Update existing session
-      db.prepare(`
+      await db.prepare(`
         UPDATE analytics_sessions
         SET last_seen = ?,
             pages_viewed = pages_viewed + 1,
@@ -68,7 +68,7 @@ router.post("/", (req, res) => {
     }
 
     // Record page view
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO analytics_page_views (session_id, visitor_id, page, created_at)
       VALUES (?, ?, ?, ?)
     `).run(sessionId, visitorId, pagePath, now);
@@ -81,7 +81,7 @@ router.post("/", (req, res) => {
 });
 
 // ── PATCH /api/track/heartbeat — keep session alive ──────────────────────
-router.patch("/heartbeat", (req, res) => {
+router.patch("/heartbeat", async (req, res) => {
   try {
     const ua = req.headers["user-agent"] || "";
     if (isBot(ua)) { res.json({ ok: true }); return; }
@@ -90,7 +90,7 @@ router.patch("/heartbeat", (req, res) => {
     if (!sessionId) { res.json({ ok: true }); return; }
 
     const now = new Date().toISOString();
-    db.prepare(`
+    await db.prepare(`
       UPDATE analytics_sessions
       SET last_seen = ?,
           duration_seconds = CAST((julianday(?) - julianday(started_at)) * 86400 AS INTEGER)

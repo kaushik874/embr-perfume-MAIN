@@ -5,7 +5,7 @@ import { logAdminAction } from "../middleware/security.js";
 
 const router = Router();
 
-router.get("/orders", (req, res) => {
+router.get("/orders", async (req, res) => {
   const status = (req.query.status as string) || "";
   const search = (req.query.search as string) || "";
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -20,16 +20,16 @@ router.get("/orders", (req, res) => {
     params.push(status);
   }
   if (search) {
-    where += " AND (o.id LIKE ? OR o.shipping_name LIKE ? OR o.shipping_email LIKE ?)";
+    where += " AND (CAST(o.id AS TEXT) LIKE ? OR o.shipping_name LIKE ? OR o.shipping_email LIKE ?)";
     const q = `%${search}%`;
     params.push(q, q, q);
   }
 
-  const countResult = db.prepare(
+  const countResult = await db.prepare(
     `SELECT COUNT(*) as total FROM orders o ${where}`
   ).get(...params) as { total: number };
 
-  const orders = db.prepare(`
+  const orders = await db.prepare(`
     SELECT o.*, u.email as account_email, u.name as account_name
     FROM orders o
     JOIN users u ON o.user_id = u.id
@@ -49,14 +49,14 @@ router.get("/orders", (req, res) => {
   });
 });
 
-router.get("/orders/stats", (_req, res) => {
-  const total = (db.prepare("SELECT COUNT(*) as c FROM orders").get() as any).c;
-  const pending = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'pending'").get() as any).c;
-  const paid = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'paid'").get() as any).c;
-  const shipped = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'shipped'").get() as any).c;
-  const delivered = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'delivered'").get() as any).c;
-  const cancelled = (db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'cancelled'").get() as any).c;
-  const revenue = (db.prepare("SELECT COALESCE(SUM(total_paise), 0) as s FROM orders WHERE status IN ('paid','shipped','delivered')").get() as any).s;
+router.get("/orders/stats", async (_req, res) => {
+  const total = ((await db.prepare("SELECT COUNT(*) as c FROM orders").get()) as any).c;
+  const pending = ((await db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'pending'").get()) as any).c;
+  const paid = ((await db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'paid'").get()) as any).c;
+  const shipped = ((await db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'shipped'").get()) as any).c;
+  const delivered = ((await db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'delivered'").get()) as any).c;
+  const cancelled = ((await db.prepare("SELECT COUNT(*) as c FROM orders WHERE status = 'cancelled'").get()) as any).c;
+  const revenue = ((await db.prepare("SELECT COALESCE(SUM(total_paise), 0) as s FROM orders WHERE status IN ('paid','shipped','delivered')").get()) as any).s;
 
   res.json({ total, pending, paid, shipped, delivered, cancelled, revenue: revenue / 100 });
 });
@@ -70,7 +70,7 @@ const bulkStatusSchema = z.object({
   status: z.enum(["pending", "paid", "shipped", "delivered", "cancelled"]),
 });
 
-router.patch("/orders/bulk/status", (req, res) => {
+router.patch("/orders/bulk/status", async (req, res) => {
   const parsed = bulkStatusSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -87,9 +87,9 @@ router.patch("/orders/bulk/status", (req, res) => {
   const params = [status, ...ids];
 
   if (status === "paid") {
-    db.prepare(`UPDATE orders SET status = ?, paid_at = datetime('now') WHERE id IN (${placeholders})`).run(...params);
+    await db.prepare(`UPDATE orders SET status = ?, paid_at = datetime('now') WHERE id IN (${placeholders})`).run(...params);
   } else {
-    db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).run(...params);
+    await db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).run(...params);
   }
 
   logAdminAction(req.user!.userId, "bulk_update_order_status", `Updated status to ${status} for ${ids.length} orders`);
@@ -97,7 +97,7 @@ router.patch("/orders/bulk/status", (req, res) => {
   res.json({ ok: true, count: ids.length });
 });
 
-router.delete("/orders/bulk", (req, res) => {
+router.delete("/orders/bulk", async (req, res) => {
   const parsed = bulkIdsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -111,16 +111,16 @@ router.delete("/orders/bulk", (req, res) => {
   }
 
   const placeholders = ids.map(() => "?").join(",");
-  db.prepare(`DELETE FROM order_items WHERE order_id IN (${placeholders})`).run(...ids);
-  db.prepare(`DELETE FROM orders WHERE id IN (${placeholders})`).run(...ids);
+  await db.prepare(`DELETE FROM order_items WHERE order_id IN (${placeholders})`).run(...ids);
+  await db.prepare(`DELETE FROM orders WHERE id IN (${placeholders})`).run(...ids);
 
   logAdminAction(req.user!.userId, "bulk_delete_orders", `Deleted ${ids.length} orders`);
 
   res.json({ ok: true, count: ids.length });
 });
 
-router.get("/orders/:id", (req, res) => {
-  const order = db.prepare(`
+router.get("/orders/:id", async (req, res) => {
+  const order = await db.prepare(`
     SELECT o.*, u.email as account_email, u.name as account_name
     FROM orders o
     JOIN users u ON o.user_id = u.id
@@ -132,7 +132,7 @@ router.get("/orders/:id", (req, res) => {
     return;
   }
 
-  const items = db.prepare(`
+  const items = await db.prepare(`
     SELECT oi.*, p.name, p.slug, p.image
     FROM order_items oi
     JOIN products p ON oi.product_id = p.id
@@ -146,7 +146,7 @@ const statusSchema = z.object({
   status: z.enum(["pending", "paid", "shipped", "delivered", "cancelled"]),
 });
 
-router.patch("/orders/:id/status", (req, res) => {
+router.patch("/orders/:id/status", async (req, res) => {
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -161,7 +161,7 @@ router.patch("/orders/:id/status", (req, res) => {
   }
 
   params.push(req.params.id);
-  const result = db.prepare(`UPDATE orders SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+  const result = await db.prepare(`UPDATE orders SET ${updates.join(", ")} WHERE id = ?`).run(...params);
 
   if (result.changes === 0) {
     res.status(404).json({ error: "Order not found" });
@@ -181,14 +181,14 @@ const trackingSchema = z.object({
   tracking_number: z.string().max(200),
 });
 
-router.patch("/orders/:id/tracking", (req, res) => {
+router.patch("/orders/:id/tracking", async (req, res) => {
   const parsed = trackingSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
 
-  const result = db.prepare("UPDATE orders SET tracking_number = ? WHERE id = ?")
+  const result = await db.prepare("UPDATE orders SET tracking_number = ? WHERE id = ?")
     .run(parsed.data.tracking_number, req.params.id);
 
   if (result.changes === 0) {
@@ -214,7 +214,7 @@ const shippingSchema = z.object({
   shipping_pincode: z.string().optional(),
 });
 
-router.patch("/orders/:id/shipping", (req, res) => {
+router.patch("/orders/:id/shipping", async (req, res) => {
   const parsed = shippingSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -236,7 +236,7 @@ router.patch("/orders/:id/shipping", (req, res) => {
   }
 
   params.push(req.params.id);
-  const result = db.prepare(`UPDATE orders SET ${setClauses.join(", ")} WHERE id = ?`).run(...params);
+  const result = await db.prepare(`UPDATE orders SET ${setClauses.join(", ")} WHERE id = ?`).run(...params);
 
   if (result.changes === 0) {
     res.status(404).json({ error: "Order not found" });
@@ -248,17 +248,17 @@ router.patch("/orders/:id/shipping", (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete("/orders/:id", (req, res) => {
-  const result = db.prepare("DELETE FROM order_items WHERE order_id = ?").run(req.params.id);
+router.delete("/orders/:id", async (req, res) => {
+  const result = await db.prepare("DELETE FROM order_items WHERE order_id = ?").run(req.params.id);
   if (result.changes === 0) {
-    const order = db.prepare("SELECT id FROM orders WHERE id = ?").get(req.params.id);
+    const order = await db.prepare("SELECT id FROM orders WHERE id = ?").get(req.params.id);
     if (!order) {
       res.status(404).json({ error: "Order not found" });
       return;
     }
   }
 
-  const deleted = db.prepare("DELETE FROM orders WHERE id = ?").run(req.params.id);
+  const deleted = await db.prepare("DELETE FROM orders WHERE id = ?").run(req.params.id);
   if (deleted.changes === 0) {
     res.status(404).json({ error: "Order not found" });
     return;

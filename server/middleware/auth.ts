@@ -49,14 +49,14 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 import { db } from "../db.js";
 
-export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     res.status(401).json({ error: "Login required" });
     return;
   }
 
   // Fetch the role directly from the database to avoid relying solely on the JWT
-  const user = db
+  const user = await db
     .prepare("SELECT role FROM users WHERE id = ?")
     .get(req.user.userId) as { role: string } | undefined;
 

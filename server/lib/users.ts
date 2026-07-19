@@ -2,21 +2,21 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "../db.js";
 
-export function ensureUserFromShipping(input: {
+export async function ensureUserFromShipping(input: {
   name: string;
   email: string;
   phone: string;
-}): { id: number; email: string; name: string } {
+}): Promise<{ id: number; email: string; name: string }> {
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim();
   const phone = input.phone.trim();
 
-  const existingByEmail = db
+  const existingByEmail = await db
     .prepare("SELECT id, email, name FROM users WHERE email = ?")
     .get(email) as { id: number; email: string; name: string } | undefined;
 
   if (existingByEmail) {
-    db.prepare("UPDATE users SET name = ?, phone = ? WHERE id = ?").run(
+    await db.prepare("UPDATE users SET name = ?, phone = ? WHERE id = ?").run(
       name,
       phone,
       existingByEmail.id,
@@ -24,12 +24,12 @@ export function ensureUserFromShipping(input: {
     return { id: existingByEmail.id, email: existingByEmail.email, name };
   }
 
-  const existingByPhone = db
+  const existingByPhone = await db
     .prepare("SELECT id, email, name FROM users WHERE phone = ? ORDER BY id DESC LIMIT 1")
     .get(phone) as { id: number; email: string; name: string } | undefined;
 
   if (existingByPhone) {
-    db.prepare("UPDATE users SET name = ?, email = ? WHERE id = ?").run(
+    await db.prepare("UPDATE users SET name = ?, email = ? WHERE id = ?").run(
       name,
       email,
       existingByPhone.id,
@@ -41,7 +41,7 @@ export function ensureUserFromShipping(input: {
     crypto.randomBytes(24).toString("hex"),
     10,
   );
-  const result = db
+  const result = await db
     .prepare(
       "INSERT INTO users (email, name, password_hash, phone) VALUES (?, ?, ?, ?)",
     )

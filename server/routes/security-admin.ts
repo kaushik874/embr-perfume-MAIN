@@ -3,18 +3,18 @@ import { db } from "../db.js";
 
 const router = Router();
 
-router.get("/security/logins", (_req, res) => {
+router.get("/security/logins", async (_req, res) => {
   try {
-    const attempts = db.prepare("SELECT * FROM login_attempts ORDER BY created_at DESC LIMIT 100").all();
+    const attempts = await db.prepare("SELECT * FROM login_attempts ORDER BY created_at DESC LIMIT 100").all();
     res.json({ attempts });
   } catch {
     res.json({ attempts: [] });
   }
 });
 
-router.get("/security/actions", (_req, res) => {
+router.get("/security/actions", async (_req, res) => {
   try {
-    const logs = db.prepare(`
+    const logs = await db.prepare(`
       SELECT a.*, u.email as admin_email 
       FROM admin_logs a
       JOIN users u ON a.user_id = u.id

@@ -4,11 +4,11 @@ import { db } from "../db.js";
 const router = Router();
 
 // Public endpoint – no auth required so checkout can validate coupons
-router.post("/validate", (req, res) => {
+router.post("/validate", async (req, res) => {
   const { code, orderTotalPaise } = req.body;
   if (!code) { res.status(400).json({ error: "Coupon code required" }); return; }
 
-  const coupon = db.prepare(
+  const coupon = await db.prepare(
     "SELECT * FROM coupons WHERE code = ? AND status = 'active'"
   ).get(String(code).toUpperCase()) as any;
 

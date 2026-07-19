@@ -89,8 +89,8 @@ const manualReviewSchema = z.object({
   created_at: z.string().optional()
 });
 
-router.get("/reviews", (_req, res) => {
-  const reviews = db.prepare(`
+router.get("/reviews", async (_req, res) => {
+  const reviews = await db.prepare(`
     SELECT r.*, p.name as product_name, p.image as product_image, u.name as user_name, u.email as user_email
     FROM reviews r
     LEFT JOIN products p ON r.product_id = p.id
@@ -107,7 +107,7 @@ router.get("/reviews", (_req, res) => {
   res.json({ reviews: formattedReviews });
 });
 
-router.post("/reviews", (req, res) => {
+router.post("/reviews", async (req, res) => {
   const parsed = manualReviewSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -116,7 +116,7 @@ router.post("/reviews", (req, res) => {
 
   const { savedImages, savedVideo } = saveMediaFiles(parsed.data.mediaFiles);
 
-  const result = db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO reviews (product_id, user_id, rating, title, comment, customer_name, customer_email, customer_phone, images, video, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?)
   `).run(
@@ -137,14 +137,14 @@ router.post("/reviews", (req, res) => {
   res.json({ id: result.lastInsertRowid });
 });
 
-router.put("/reviews/:id", (req, res) => {
+router.put("/reviews/:id", async (req, res) => {
   const parsed = manualReviewSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
 
-  const existing = db.prepare("SELECT * FROM reviews WHERE id = ?").get(req.params.id) as any;
+  const existing = await db.prepare("SELECT * FROM reviews WHERE id = ?").get(req.params.id) as any;
   if (!existing) {
     res.status(404).json({ error: "Review not found" });
     return;
@@ -160,7 +160,7 @@ router.put("/reviews/:id", (req, res) => {
     if (savedVideo) video = savedVideo;
   }
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE reviews SET 
       product_id = ?, rating = ?, title = ?, comment = ?, 
       customer_name = ?, customer_email = ?, customer_phone = ?,
@@ -184,7 +184,7 @@ router.put("/reviews/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-router.patch("/reviews/:id/status", (req, res) => {
+router.patch("/reviews/:id/status", async (req, res) => {
   const { status, is_pinned, is_featured, is_hidden } = req.body;
   
   const updates: string[] = [];
@@ -216,27 +216,27 @@ router.patch("/reviews/:id/status", (req, res) => {
 
   if (updates.length > 0) {
     values.push(req.params.id);
-    db.prepare(`UPDATE reviews SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+    await db.prepare(`UPDATE reviews SET ${updates.join(", ")} WHERE id = ?`).run(...values);
     logAdminAction(req.user!.userId, "update_review_status", `Updated flags/status for review #${req.params.id}`);
   }
 
   res.json({ ok: true });
 });
 
-router.patch("/reviews/:id/reply", (req, res) => {
+router.patch("/reviews/:id/reply", async (req, res) => {
   const schema = z.object({ reply: z.string().max(2000) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Reply must be a string under 2000 characters." });
     return;
   }
-  db.prepare("UPDATE reviews SET reply = ? WHERE id = ?").run(parsed.data.reply, req.params.id);
+  await db.prepare("UPDATE reviews SET reply = ? WHERE id = ?").run(parsed.data.reply, req.params.id);
   logAdminAction(req.user!.userId, "reply_review", `Replied to review #${req.params.id}`);
   res.json({ ok: true });
 });
 
-router.delete("/reviews/:id", (req, res) => {
-  db.prepare("DELETE FROM reviews WHERE id = ?").run(req.params.id);
+router.delete("/reviews/:id", async (req, res) => {
+  await db.prepare("DELETE FROM reviews WHERE id = ?").run(req.params.id);
   logAdminAction(req.user!.userId, "delete_review", `Deleted review #${req.params.id}`);
   res.json({ ok: true });
 });

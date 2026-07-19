@@ -3,7 +3,7 @@ import { formatAddress, type CheckoutAddressInput } from "./addresses.js";
 
 export type LineItemInput = { productId?: number; slug?: string; quantity: number };
 
-export function buildOrderLines(items: LineItemInput[]) {
+export async function buildOrderLines(items: LineItemInput[]) {
   const getById = db.prepare(
     "SELECT id, name, price, stock FROM products WHERE id = ?",
   );
@@ -23,9 +23,9 @@ export function buildOrderLines(items: LineItemInput[]) {
     let product: { id: number; name: string; price: number; stock: number } | undefined;
 
     if (item.productId) {
-      product = getById.get(item.productId) as typeof product;
+      product = await getById.get(item.productId) as typeof product;
     } else if (item.slug) {
-      product = getBySlug.get(item.slug) as typeof product;
+      product = await getBySlug.get(item.slug) as typeof product;
     }
 
     if (!product) {
@@ -50,7 +50,7 @@ export function buildOrderLines(items: LineItemInput[]) {
   return { totalPaise, lineItems };
 }
 
-export function createOrderRecord(
+export async function createOrderRecord(
   userId: number,
   totalPaise: number,
   lineItems: {
@@ -81,8 +81,8 @@ export function createOrderRecord(
     "UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?"
   );
 
-  return db.transaction(() => {
-    const result = insertOrder.run(
+  return db.transaction(async () => {
+    const result = await insertOrder.run(
       userId,
       totalPaise,
       shipping?.name ?? null,
@@ -103,13 +103,13 @@ export function createOrderRecord(
     const orderId = Number(result.lastInsertRowid);
 
     for (const line of lineItems) {
-      insertItem.run(
+      await insertItem.run(
         orderId,
         line.productId,
         line.quantity,
         line.pricePaise,
       );
-      decrementStock.run(line.quantity, line.productId);
+      await decrementStock.run(line.quantity, line.productId);
     }
 
     return orderId;
@@ -120,9 +120,9 @@ export function startOrderExpiryJob() {
   const intervalMs = 15 * 60 * 1000; // Check every 15 minutes
   const expiryMinutes = 30; // Expire after 30 minutes
 
-  const timer = setInterval(() => {
+  const timer = setInterval(async () => {
     try {
-      const expiredOrders = db.prepare(`
+      const expiredOrders = await db.prepare(`
         SELECT id FROM orders 
         WHERE status = 'pending' 
         AND created_at < datetime('now', '-${expiryMinutes} minutes')
@@ -140,13 +140,13 @@ export function startOrderExpiryJob() {
         "UPDATE orders SET status = 'cancelled' WHERE id = ?"
       );
 
-      db.transaction(() => {
+      await db.transaction(async () => {
         for (const order of expiredOrders) {
-          const items = getItems.all(order.id) as { product_id: number; quantity: number }[];
+          const items = await getItems.all(order.id) as { product_id: number; quantity: number }[];
           for (const item of items) {
-            restoreStock.run(item.quantity, item.product_id);
+            await restoreStock.run(item.quantity, item.product_id);
           }
-          cancelOrder.run(order.id);
+          await cancelOrder.run(order.id);
         }
       })();
       console.log(`[Orders] Cancelled ${expiredOrders.length} expired pending orders and restored stock.`);

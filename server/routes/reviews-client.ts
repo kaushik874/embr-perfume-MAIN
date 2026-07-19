@@ -36,8 +36,8 @@ function hasImageSignature(buffer: Buffer, mimeType: string) {
 }
 
 // GET /api/reviews/:slug - Fetch reviews for a product
-router.get("/:slug", (req, res) => {
-  const product = db.prepare("SELECT id FROM products WHERE slug = ?").get(req.params.slug) as { id: number } | undefined;
+router.get("/:slug", async (req, res) => {
+  const product = await db.prepare("SELECT id FROM products WHERE slug = ?").get(req.params.slug) as { id: number } | undefined;
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
@@ -50,7 +50,7 @@ router.get("/:slug", (req, res) => {
   if (sortBy === "highest") orderClause = "r.rating DESC, r.created_at DESC";
   if (sortBy === "lowest") orderClause = "r.rating ASC, r.created_at DESC";
 
-  const reviews = db.prepare(`
+  const reviews = await db.prepare(`
     SELECT r.*, u.name as user_name
     FROM reviews r
     LEFT JOIN users u ON r.user_id = u.id
@@ -70,9 +70,9 @@ router.get("/:slug", (req, res) => {
 });
 
 // GET /api/reviews/eligibility/:slug - Check if user can review
-router.get("/eligibility/:slug", requireAuth, (req, res) => {
+router.get("/eligibility/:slug", requireAuth, async (req, res) => {
   const userId = req.user!.userId;
-  const product = db.prepare("SELECT id FROM products WHERE slug = ?").get(req.params.slug) as { id: number } | undefined;
+  const product = await db.prepare("SELECT id FROM products WHERE slug = ?").get(req.params.slug) as { id: number } | undefined;
   
   if (!product) {
     res.status(404).json({ error: "Product not found" });
@@ -80,7 +80,7 @@ router.get("/eligibility/:slug", requireAuth, (req, res) => {
   }
 
   // Find if user has a paid or delivered order for this product
-  const eligibleOrder = db.prepare(`
+  const eligibleOrder = await db.prepare(`
     SELECT o.id 
     FROM orders o
     JOIN order_items oi ON o.id = oi.order_id
@@ -89,7 +89,7 @@ router.get("/eligibility/:slug", requireAuth, (req, res) => {
   `).get(userId, product.id) as { id: number } | undefined;
 
   // Find if user already reviewed
-  const existingReview = db.prepare(`
+  const existingReview = await db.prepare(`
     SELECT id FROM reviews WHERE user_id = ? AND product_id = ?
   `).get(userId, product.id) as { id: number } | undefined;
 
@@ -157,9 +157,9 @@ function saveMediaFiles(files: any[]) {
 }
 
 // POST /api/reviews/:slug - Submit review
-router.post("/:slug", requireAuth, (req, res) => {
+router.post("/:slug", requireAuth, async (req, res) => {
   const userId = req.user!.userId;
-  const product = db.prepare("SELECT id FROM products WHERE slug = ?").get(req.params.slug) as { id: number } | undefined;
+  const product = await db.prepare("SELECT id FROM products WHERE slug = ?").get(req.params.slug) as { id: number } | undefined;
   
   if (!product) {
     res.status(404).json({ error: "Product not found" });
@@ -173,7 +173,7 @@ router.post("/:slug", requireAuth, (req, res) => {
   }
 
   // Verify eligibility
-  const eligibleOrder = db.prepare(`
+  const eligibleOrder = await db.prepare(`
     SELECT o.id 
     FROM orders o
     JOIN order_items oi ON o.id = oi.order_id
@@ -187,7 +187,7 @@ router.post("/:slug", requireAuth, (req, res) => {
   }
 
   // Check existing
-  const existingReview = db.prepare(`
+  const existingReview = await db.prepare(`
     SELECT id FROM reviews WHERE user_id = ? AND product_id = ?
   `).get(userId, product.id) as { id: number } | undefined;
 
@@ -198,7 +198,7 @@ router.post("/:slug", requireAuth, (req, res) => {
 
   const { savedImages, savedVideo } = saveMediaFiles(parsed.data.mediaFiles);
 
-  const result = db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO reviews (product_id, user_id, order_id, rating, title, comment, images, video, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `).run(
@@ -216,11 +216,11 @@ router.post("/:slug", requireAuth, (req, res) => {
 });
 
 // PUT /api/reviews/:id - Edit review
-router.put("/:id", requireAuth, (req, res) => {
+router.put("/:id", requireAuth, async (req, res) => {
   const userId = req.user!.userId;
   const reviewId = req.params.id;
 
-  const review = db.prepare("SELECT * FROM reviews WHERE id = ? AND user_id = ?").get(reviewId, userId) as any;
+  const review = await db.prepare("SELECT * FROM reviews WHERE id = ? AND user_id = ?").get(reviewId, userId) as any;
   if (!review) {
     res.status(403).json({ error: "Review not found or unauthorized" });
     return;
@@ -243,7 +243,7 @@ router.put("/:id", requireAuth, (req, res) => {
     if (savedVideo) video = savedVideo;
   }
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE reviews 
     SET rating = ?, title = ?, comment = ?, images = ?, video = ?, status = 'pending'
     WHERE id = ?

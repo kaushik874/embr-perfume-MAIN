@@ -6,17 +6,17 @@ import path from "path";
 const router = Router();
 
 // GET all content
-router.get("/content", (_req, res) => {
-  const rows = db.prepare("SELECT * FROM site_content").all() as { key: string; value: string }[];
+router.get("/content", async (_req, res) => {
+  const rows = await db.prepare("SELECT * FROM site_content").all() as { key: string; value: string }[];
   const content = rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
   res.json({ content });
 });
 
 // POST upsert a single key
-router.post("/content", (req, res) => {
+router.post("/content", async (req, res) => {
   const { key, value } = req.body;
   if (!key) return res.status(400).json({ error: "key is required" });
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO site_content (key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run(key, value ?? "");
@@ -41,17 +41,17 @@ router.post("/content/upload", (req, res) => {
 });
 
 // DELETE a content key
-router.delete("/content/:key", (req, res) => {
+router.delete("/content/:key", async (req, res) => {
   const { key } = req.params;
-  db.prepare("DELETE FROM site_content WHERE key = ?").run(key);
+  await db.prepare("DELETE FROM site_content WHERE key = ?").run(key);
   res.json({ ok: true });
 });
 
 // GET all section visibility flags
-router.get("/sections", (_req, res) => {
+router.get("/sections", async (_req, res) => {
   let sections: { key: string; hidden: number }[] = [];
   try {
-    sections = db.prepare("SELECT * FROM site_sections").all() as { key: string; hidden: number }[];
+    sections = await db.prepare("SELECT * FROM site_sections").all() as { key: string; hidden: number }[];
   } catch {
     // table not ready yet
   }
@@ -59,11 +59,11 @@ router.get("/sections", (_req, res) => {
 });
 
 // PATCH section visibility
-router.patch("/sections/:key", (req, res) => {
+router.patch("/sections/:key", async (req, res) => {
   const { key } = req.params;
   const { hidden } = req.body;
   const val = hidden ? 1 : 0;
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO site_sections (key, hidden) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET hidden = excluded.hidden
   `).run(key, val);

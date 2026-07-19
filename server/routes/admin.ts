@@ -4,14 +4,14 @@ import { z } from "zod";
 
 const router = Router();
 
-router.get("/dashboard", (req, res) => {
-  const totalOrders = (db.prepare("SELECT COUNT(*) as count FROM orders").get() as any).count;
-  const pendingOrders = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'").get() as any).count;
-  const paidOrders = (db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'paid'").get() as any).count;
+router.get("/dashboard", async (_req, res) => {
+  const totalOrders = ((await db.prepare("SELECT COUNT(*) as count FROM orders").get()) as any).count;
+  const pendingOrders = ((await db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'").get()) as any).count;
+  const paidOrders = ((await db.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'paid'").get()) as any).count;
   
-  const totalRevenuePaise = (db.prepare("SELECT SUM(total_paise) as sum FROM orders WHERE status = 'paid'").get() as any).sum || 0;
+  const totalRevenuePaise = ((await db.prepare("SELECT SUM(total_paise) as sum FROM orders WHERE status = 'paid'").get()) as any).sum || 0;
 
-  const recentOrders = db.prepare(`
+  const recentOrders = await db.prepare(`
     SELECT o.id, o.status, o.total_paise, o.created_at, u.name as customer_name
     FROM orders o
     JOIN users u ON o.user_id = u.id
@@ -19,7 +19,7 @@ router.get("/dashboard", (req, res) => {
     LIMIT 5
   `).all();
 
-  const recentUsers = db.prepare(`
+  const recentUsers = await db.prepare(`
     SELECT id, name, email, created_at, role
     FROM users
     ORDER BY created_at DESC
@@ -36,8 +36,8 @@ router.get("/dashboard", (req, res) => {
   });
 });
 
-router.get("/orders", (req, res) => {
-  const orders = db.prepare(`
+router.get("/orders", async (_req, res) => {
+  const orders = await db.prepare(`
     SELECT o.id, o.status, o.total_paise, o.created_at, o.razorpay_order_id, o.razorpay_payment_id,
            o.shipping_name, o.shipping_email, o.shipping_phone,
            u.email as account_email
@@ -48,9 +48,9 @@ router.get("/orders", (req, res) => {
   res.json({ orders });
 });
 
-router.get("/orders/:id", (req, res) => {
+router.get("/orders/:id", async (req, res) => {
   const orderId = req.params.id;
-  const order = db.prepare(`
+  const order = await db.prepare(`
     SELECT o.*, u.email as account_email, u.name as account_name
     FROM orders o
     JOIN users u ON o.user_id = u.id
@@ -62,7 +62,7 @@ router.get("/orders/:id", (req, res) => {
     return;
   }
 
-  const items = db.prepare(`
+  const items = await db.prepare(`
     SELECT oi.quantity, oi.price_paise, p.name, p.slug
     FROM order_items oi
     JOIN products p ON oi.product_id = p.id
@@ -76,14 +76,14 @@ const statusSchema = z.object({
   status: z.enum(["pending", "paid", "shipped", "delivered", "cancelled"])
 });
 
-router.patch("/orders/:id/status", (req, res) => {
+router.patch("/orders/:id/status", async (req, res) => {
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
 
-  const result = db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(parsed.data.status, req.params.id);
+  const result = await db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(parsed.data.status, req.params.id);
   if (result.changes === 0) {
     res.status(404).json({ error: "Order not found" });
     return;
@@ -91,8 +91,8 @@ router.patch("/orders/:id/status", (req, res) => {
   res.json({ ok: true });
 });
 
-router.get("/users", (req, res) => {
-  const users = db.prepare(`
+router.get("/users", async (_req, res) => {
+  const users = await db.prepare(`
     SELECT u.id, u.name, u.email, u.phone, u.role, u.created_at,
            COUNT(o.id) as order_count
     FROM users u
@@ -103,8 +103,8 @@ router.get("/users", (req, res) => {
   res.json({ users });
 });
 
-router.get("/products", (req, res) => {
-  const products = db.prepare("SELECT * FROM products ORDER BY id DESC").all();
+router.get("/products", async (_req, res) => {
+  const products = await db.prepare("SELECT * FROM products ORDER BY id DESC").all();
   res.json({ products });
 });
 
@@ -125,14 +125,14 @@ const productSchema = z.object({
   featured: z.number().int().min(0).max(1).default(0)
 });
 
-router.post("/products", (req, res) => {
+router.post("/products", async (req, res) => {
   const parsed = productSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
   try {
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO products (slug, name, notes, description, price, mrp, discount_price, stock, sku, category, status, tags, image, featured)
       VALUES (@slug, @name, @notes, @description, @price, @mrp, @discount_price, @stock, @sku, @category, @status, @tags, @image, @featured)
     `).run(parsed.data);
@@ -142,13 +142,13 @@ router.post("/products", (req, res) => {
   }
 });
 
-router.put("/products/:id", (req, res) => {
+router.put("/products/:id", async (req, res) => {
   const parsed = productSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
-  const result = db.prepare(`
+  const result = await db.prepare(`
     UPDATE products SET
       slug = @slug, name = @name, notes = @notes, description = @description,
       price = @price, mrp = @mrp, image = @image, featured = @featured
@@ -162,10 +162,10 @@ router.put("/products/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete("/products/:id", (req, res) => {
+router.delete("/products/:id", async (req, res) => {
   // Simple delete (in real app, consider soft delete or check if order_items depend on it)
   try {
-    const result = db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
+    const result = await db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
     if (result.changes === 0) {
       res.status(404).json({ error: "Product not found" });
       return;

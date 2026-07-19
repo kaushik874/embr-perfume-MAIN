@@ -88,9 +88,9 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   next();
 }
 
-export function blockRepeatedFailedLogins(req: Request, res: Response, next: NextFunction) {
+export async function blockRepeatedFailedLogins(req: Request, res: Response, next: NextFunction) {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
-  const recentFailures = db
+  const recentFailures = await db
     .prepare(
       "SELECT COUNT(*) as count FROM login_attempts WHERE ip = ? AND success = 0 AND created_at >= datetime('now', '-30 minutes')",
     )
@@ -106,40 +106,40 @@ export function blockRepeatedFailedLogins(req: Request, res: Response, next: Nex
   next();
 }
 
+function ignoreDbLogFailure(promise: Promise<unknown>) {
+  void promise.catch(() => {
+    // Login/admin audit logging should never break the user-facing request.
+  });
+}
+
 /**
  * Log failed login attempts to detect brute-force patterns.
  */
 export function logFailedLogin(email: string, ip: string) {
-  try {
+  ignoreDbLogFailure(
     db.prepare(
       "INSERT INTO login_attempts (email, ip, success) VALUES (?, ?, 0)"
-    ).run(email, ip);
-  } catch {
-    // login_attempts table may not exist yet
-  }
+    ).run(email, ip),
+  );
 }
 
 export function logSuccessfulLogin(email: string, ip: string) {
-  try {
+  ignoreDbLogFailure(
     db.prepare(
       "INSERT INTO login_attempts (email, ip, success) VALUES (?, ?, 1)"
-    ).run(email, ip);
-  } catch {
-    // login_attempts table may not exist yet
-  }
+    ).run(email, ip),
+  );
 }
 
 /**
  * Log admin actions for audit trail.
  */
 export function logAdminAction(userId: number, action: string, details: string) {
-  try {
+  ignoreDbLogFailure(
     db.prepare(
       "INSERT INTO admin_logs (user_id, action, details) VALUES (?, ?, ?)"
-    ).run(userId, action, details);
-  } catch {
-    // admin_logs table may not exist yet
-  }
+    ).run(userId, action, details),
+  );
 }
 
 /**

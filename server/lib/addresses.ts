@@ -30,29 +30,29 @@ export function formatAddress(address: CheckoutAddressInput) {
     .join(", ");
 }
 
-export function saveCustomerAddress(
+export async function saveCustomerAddress(
   userId: number,
   address: CheckoutAddressInput,
   opts: { existingAddressId?: number; setDefault?: boolean; updateExisting?: boolean } = {},
-) {
-  const count = db
+): Promise<number> {
+  const count = await db
     .prepare("SELECT COUNT(*) as c FROM customer_addresses WHERE user_id = ?")
     .get(userId) as { c: number };
   const shouldDefault = opts.setDefault || count.c === 0;
   const shouldUpdate = Boolean(opts.updateExisting && opts.existingAddressId);
 
-  return db.transaction(() => {
+  return db.transaction(async () => {
     if (shouldDefault) {
-      db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(userId);
+      await db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(userId);
     }
 
     if (shouldUpdate && opts.existingAddressId) {
-      const existing = db
+      const existing = await db
         .prepare("SELECT id FROM customer_addresses WHERE id = ? AND user_id = ?")
         .get(opts.existingAddressId, userId) as { id: number } | undefined;
 
       if (existing) {
-        db.prepare(`
+        await db.prepare(`
           UPDATE customer_addresses
           SET full_name = ?, mobile = ?, email = ?, house_number = ?, street = ?,
               area = ?, city = ?, state = ?, pincode = ?, landmark = ?,
@@ -80,7 +80,7 @@ export function saveCustomerAddress(
       }
     }
 
-    const duplicate = db.prepare(`
+    const duplicate = await db.prepare(`
       SELECT id FROM customer_addresses 
       WHERE user_id = ? AND full_name = ? AND mobile = ? AND email = ? 
       AND house_number = ? AND street = ? AND area = ? AND city = ? 
@@ -93,12 +93,12 @@ export function saveCustomerAddress(
 
     if (duplicate) {
       if (shouldDefault) {
-        db.prepare("UPDATE customer_addresses SET is_default = 1, updated_at = datetime('now') WHERE id = ?").run(duplicate.id);
+        await db.prepare("UPDATE customer_addresses SET is_default = 1, updated_at = datetime('now') WHERE id = ?").run(duplicate.id);
       }
       return duplicate.id;
     }
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO customer_addresses (
         user_id, full_name, mobile, email, house_number, street, area, city,
         state, pincode, landmark, alternate_mobile, company_name, is_default

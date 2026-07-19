@@ -13,12 +13,12 @@ const couponSchema = z.object({
   usage_limit: z.number().int().positive().nullable().optional(),
 });
 
-router.get("/coupons", (_req, res) => {
-  const coupons = db.prepare("SELECT * FROM coupons ORDER BY created_at DESC").all();
+router.get("/coupons", async (_req, res) => {
+  const coupons = await db.prepare("SELECT * FROM coupons ORDER BY created_at DESC").all();
   res.json({ coupons });
 });
 
-router.post("/coupons", (req, res) => {
+router.post("/coupons", async (req, res) => {
   const parsed = couponSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -26,7 +26,7 @@ router.post("/coupons", (req, res) => {
   }
   const { code, discount_type, discount_value, expiry_date, usage_limit } = parsed.data;
   try {
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO coupons (code, discount_type, discount_value, expiry_date, usage_limit)
       VALUES (?, ?, ?, ?, ?)
     `).run(code, discount_type, discount_value, expiry_date ?? null, usage_limit ?? null);
@@ -42,10 +42,10 @@ router.post("/coupons", (req, res) => {
   }
 });
 
-router.delete("/coupons/:id", (req, res) => {
-  const coupon = db.prepare("SELECT code FROM coupons WHERE id = ?").get(req.params.id) as any;
+router.delete("/coupons/:id", async (req, res) => {
+  const coupon = await db.prepare("SELECT code FROM coupons WHERE id = ?").get(req.params.id) as any;
   if (!coupon) { res.status(404).json({ error: "Coupon not found" }); return; }
-  db.prepare("DELETE FROM coupons WHERE id = ?").run(req.params.id);
+  await db.prepare("DELETE FROM coupons WHERE id = ?").run(req.params.id);
   logAdminAction(req.user!.userId, "delete_coupon", `Deleted coupon ${coupon.code}`);
   res.json({ ok: true });
 });

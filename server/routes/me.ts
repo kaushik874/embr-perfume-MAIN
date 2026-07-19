@@ -5,8 +5,8 @@ import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
-router.get("/", requireAuth, (req, res) => {
-  const user = db
+router.get("/", requireAuth, async (req, res) => {
+  const user = await db
     .prepare("SELECT id, email, name, phone, role, created_at FROM users WHERE id = ?")
     .get(req.user!.userId);
 
@@ -34,8 +34,8 @@ const addressSchema = z.object({
   is_default: z.boolean().optional(),
 });
 
-router.get("/addresses", requireAuth, (req, res) => {
-  const addresses = db
+router.get("/addresses", requireAuth, async (req, res) => {
+  const addresses = await db
     .prepare(
       `SELECT * FROM customer_addresses
        WHERE user_id = ?
@@ -46,7 +46,7 @@ router.get("/addresses", requireAuth, (req, res) => {
   res.json({ addresses });
 });
 
-router.post("/addresses", requireAuth, (req, res) => {
+router.post("/addresses", requireAuth, async (req, res) => {
   const parsed = addressSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -54,16 +54,16 @@ router.post("/addresses", requireAuth, (req, res) => {
   }
 
   const data = parsed.data;
-  const count = db
+  const count = await db
     .prepare("SELECT COUNT(*) as c FROM customer_addresses WHERE user_id = ?")
     .get(req.user!.userId) as { c: number };
   const isDefault = data.is_default || count.c === 0;
 
-  const id = db.transaction(() => {
+  const id = await db.transaction(async () => {
     if (isDefault) {
-      db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(req.user!.userId);
+      await db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(req.user!.userId);
     }
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO customer_addresses (
         user_id, full_name, mobile, email, house_number, street, area, city,
         state, pincode, landmark, alternate_mobile, company_name, is_default
@@ -91,7 +91,7 @@ router.post("/addresses", requireAuth, (req, res) => {
   res.status(201).json({ id });
 });
 
-router.patch("/addresses/:id", requireAuth, (req, res) => {
+router.patch("/addresses/:id", requireAuth, async (req, res) => {
   const parsed = addressSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -102,11 +102,11 @@ router.patch("/addresses/:id", requireAuth, (req, res) => {
   const addressId = Number(req.params.id);
   const isDefault = Boolean(data.is_default);
 
-  const changes = db.transaction(() => {
+  const changes = await db.transaction(async () => {
     if (isDefault) {
-      db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(req.user!.userId);
+      await db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(req.user!.userId);
     }
-    return db.prepare(`
+    const result = await db.prepare(`
       UPDATE customer_addresses
       SET full_name = ?, mobile = ?, email = ?, house_number = ?, street = ?,
           area = ?, city = ?, state = ?, pincode = ?, landmark = ?,
@@ -129,7 +129,8 @@ router.patch("/addresses/:id", requireAuth, (req, res) => {
       isDefault ? 1 : 0,
       addressId,
       req.user!.userId,
-    ).changes;
+    );
+    return result.changes;
   })();
 
   if (!changes) {
@@ -140,9 +141,9 @@ router.patch("/addresses/:id", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-router.post("/addresses/:id/default", requireAuth, (req, res) => {
+router.post("/addresses/:id/default", requireAuth, async (req, res) => {
   const addressId = Number(req.params.id);
-  const existing = db
+  const existing = await db
     .prepare("SELECT id FROM customer_addresses WHERE id = ? AND user_id = ?")
     .get(addressId, req.user!.userId);
 
@@ -151,16 +152,16 @@ router.post("/addresses/:id/default", requireAuth, (req, res) => {
     return;
   }
 
-  db.transaction(() => {
-    db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(req.user!.userId);
-    db.prepare("UPDATE customer_addresses SET is_default = 1, updated_at = datetime('now') WHERE id = ?").run(addressId);
+  await db.transaction(async () => {
+    await db.prepare("UPDATE customer_addresses SET is_default = 0 WHERE user_id = ?").run(req.user!.userId);
+    await db.prepare("UPDATE customer_addresses SET is_default = 1, updated_at = datetime('now') WHERE id = ?").run(addressId);
   })();
 
   res.json({ ok: true });
 });
 
-router.delete("/addresses/:id", requireAuth, (req, res) => {
-  const result = db
+router.delete("/addresses/:id", requireAuth, async (req, res) => {
+  const result = await db
     .prepare("DELETE FROM customer_addresses WHERE id = ? AND user_id = ?")
     .run(req.params.id, req.user!.userId);
 
@@ -169,16 +170,16 @@ router.delete("/addresses/:id", requireAuth, (req, res) => {
     return;
   }
 
-  const defaultExists = db
+  const defaultExists = await db
     .prepare("SELECT id FROM customer_addresses WHERE user_id = ? AND is_default = 1")
     .get(req.user!.userId);
 
   if (!defaultExists) {
-    const next = db
+    const next = await db
       .prepare("SELECT id FROM customer_addresses WHERE user_id = ? ORDER BY updated_at DESC, id DESC LIMIT 1")
       .get(req.user!.userId) as { id: number } | undefined;
     if (next) {
-      db.prepare("UPDATE customer_addresses SET is_default = 1 WHERE id = ?").run(next.id);
+      await db.prepare("UPDATE customer_addresses SET is_default = 1 WHERE id = ?").run(next.id);
     }
   }
 

@@ -22,19 +22,19 @@ type AboutBannerRow = {
 };
 
 // Public route - get about banner
-router.get("/about-banner", (_req, res) => {
-  const banner = db.prepare("SELECT * FROM about_banner WHERE id = 1").get() as AboutBannerRow | undefined;
+router.get("/about-banner", async (_req, res) => {
+  const banner = await db.prepare("SELECT * FROM about_banner WHERE id = 1").get() as AboutBannerRow | undefined;
   res.json({ banner: banner ?? null });
 });
 
 // Admin: get about banner
-router.get("/about", (_req, res) => {
-  const banner = db.prepare("SELECT * FROM about_banner WHERE id = 1").get() as AboutBannerRow | undefined;
+router.get("/about", async (_req, res) => {
+  const banner = await db.prepare("SELECT * FROM about_banner WHERE id = 1").get() as AboutBannerRow | undefined;
   res.json({ banner: banner ?? null });
 });
 
 // Admin: update about banner
-router.put("/about", (req, res) => {
+router.put("/about", async (req, res) => {
   const body = req.body as Partial<AboutBannerRow>;
 
   const flag = (v: unknown, fallback: number) => {
@@ -46,7 +46,7 @@ router.put("/about", (req, res) => {
 
   const text = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE about_banner SET
       title = ?,
       subtitle = ?,

@@ -4,7 +4,7 @@ import { db } from "../db.js";
 const router = Router();
 
 // ── GET /api/admin/analytics/summary ─────────────────────────────────────
-router.get("/summary", (_req, res) => {
+router.get("/summary", async (_req, res) => {
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -15,32 +15,33 @@ router.get("/summary", (_req, res) => {
     const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
     const liveThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
-    const totalVisits = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions").get() as any).c;
-    const totalUnique = (db.prepare("SELECT COUNT(*) as c FROM analytics_visitors").get() as any).c;
-    const returning = (db.prepare("SELECT COUNT(*) as c FROM analytics_visitors WHERE visit_count > 1").get() as any).c;
-    const live = (db.prepare("SELECT COUNT(DISTINCT visitor_id) as c FROM analytics_sessions WHERE last_seen >= ?").get(liveThreshold) as any).c;
+    const totalVisits = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions").get()) as any).c;
+    const totalUnique = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_visitors").get()) as any).c;
+    const returning = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_visitors WHERE visit_count > 1").get()) as any).c;
+    const live = ((await db.prepare("SELECT COUNT(DISTINCT visitor_id) as c FROM analytics_sessions WHERE last_seen >= ?").get(liveThreshold)) as any).c;
 
-    const todayVisits = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(todayStart) as any).c;
-    const yesterdayVisits = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ? AND started_at < ?").get(yesterdayStart, todayStart) as any).c;
-    const last7Visits = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(last7Start) as any).c;
-    const last30Visits = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(last30Start) as any).c;
-    const monthVisits = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(monthStart) as any).c;
-    const yearVisits = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(yearStart) as any).c;
+    const todayVisits = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(todayStart)) as any).c;
+    const yesterdayVisits = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ? AND started_at < ?").get(yesterdayStart, todayStart)) as any).c;
+    const last7Visits = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(last7Start)) as any).c;
+    const last30Visits = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(last30Start)) as any).c;
+    const monthVisits = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(monthStart)) as any).c;
+    const yearVisits = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE started_at >= ?").get(yearStart)) as any).c;
 
-    const avgDuration = (db.prepare("SELECT AVG(duration_seconds) as v FROM analytics_sessions WHERE duration_seconds > 0").get() as any).v || 0;
-    const bounceRate = (() => {
-      const total = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions").get() as any).c;
+    const avgDuration = ((await db.prepare("SELECT AVG(duration_seconds) as v FROM analytics_sessions WHERE duration_seconds > 0").get()) as any).v || 0;
+    const totalForBounce = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions").get()) as any).c;
+    const computedBounceRate = await (async () => {
+      const total = totalForBounce;
       if (!total) return 0;
-      const bounced = (db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE is_bounce = 1 OR pages_viewed <= 1").get() as any).c;
+      const bounced = ((await db.prepare("SELECT COUNT(*) as c FROM analytics_sessions WHERE is_bounce = 1 OR pages_viewed <= 1").get()) as any).c;
       return Math.round((bounced / total) * 100);
     })();
-    const avgPages = (db.prepare("SELECT AVG(pages_viewed) as v FROM analytics_sessions").get() as any).v || 0;
+    const avgPages = ((await db.prepare("SELECT AVG(pages_viewed) as v FROM analytics_sessions").get()) as any).v || 0;
 
     res.json({
       totalVisits, totalUnique, returning, live,
       todayVisits, yesterdayVisits, last7Visits, last30Visits, monthVisits, yearVisits,
       avgDuration: Math.round(avgDuration),
-      bounceRate,
+      bounceRate: computedBounceRate,
       avgPages: Math.round(avgPages * 10) / 10,
     });
   } catch (err) {
@@ -50,7 +51,7 @@ router.get("/summary", (_req, res) => {
 });
 
 // ── GET /api/admin/analytics/chart ───────────────────────────────────────
-router.get("/chart", (req, res) => {
+router.get("/chart", async (req, res) => {
   try {
     const range = (req.query.range as string) || "7d";
     let sql: string;
@@ -90,7 +91,7 @@ router.get("/chart", (req, res) => {
       `;
     }
 
-    const rows = db.prepare(sql).all(...params);
+    const rows = await db.prepare(sql).all(...params);
     res.json({ chart: rows });
   } catch (err) {
     console.error("Analytics chart error:", err);
@@ -99,15 +100,15 @@ router.get("/chart", (req, res) => {
 });
 
 // ── GET /api/admin/analytics/pages ───────────────────────────────────────
-router.get("/pages", (_req, res) => {
+router.get("/pages", async (_req, res) => {
   try {
-    const topPages = db.prepare(`
+    const topPages = await db.prepare(`
       SELECT page, COUNT(*) as views
       FROM analytics_page_views
       GROUP BY page ORDER BY views DESC LIMIT 20
     `).all();
 
-    const landingPages = db.prepare(`
+    const landingPages = await db.prepare(`
       SELECT landing_page as page, COUNT(*) as sessions
       FROM analytics_sessions
       WHERE landing_page IS NOT NULL AND landing_page != ''
@@ -121,19 +122,19 @@ router.get("/pages", (_req, res) => {
 });
 
 // ── GET /api/admin/analytics/devices ─────────────────────────────────────
-router.get("/devices", (_req, res) => {
+router.get("/devices", async (_req, res) => {
   try {
-    const devices = db.prepare(`
+    const devices = await db.prepare(`
       SELECT device, COUNT(*) as count FROM analytics_visitors
       WHERE device IS NOT NULL GROUP BY device ORDER BY count DESC
     `).all();
 
-    const browsers = db.prepare(`
+    const browsers = await db.prepare(`
       SELECT browser, COUNT(*) as count FROM analytics_visitors
       WHERE browser IS NOT NULL GROUP BY browser ORDER BY count DESC
     `).all();
 
-    const os = db.prepare(`
+    const os = await db.prepare(`
       SELECT os, COUNT(*) as count FROM analytics_visitors
       WHERE os IS NOT NULL GROUP BY os ORDER BY count DESC
     `).all();
@@ -145,15 +146,15 @@ router.get("/devices", (_req, res) => {
 });
 
 // ── GET /api/admin/analytics/geo ─────────────────────────────────────────
-router.get("/geo", (_req, res) => {
+router.get("/geo", async (_req, res) => {
   try {
-    const countries = db.prepare(`
+    const countries = await db.prepare(`
       SELECT country, COUNT(*) as count FROM analytics_visitors
       WHERE country IS NOT NULL AND country != '' AND country != 'unknown'
       GROUP BY country ORDER BY count DESC LIMIT 20
     `).all();
 
-    const cities = db.prepare(`
+    const cities = await db.prepare(`
       SELECT city, region, country, COUNT(*) as count FROM analytics_visitors
       WHERE city IS NOT NULL AND city != ''
       GROUP BY city, region, country ORDER BY count DESC LIMIT 20
@@ -166,16 +167,16 @@ router.get("/geo", (_req, res) => {
 });
 
 // ── GET /api/admin/analytics/referrers ───────────────────────────────────
-router.get("/referrers", (_req, res) => {
+router.get("/referrers", async (_req, res) => {
   try {
-    const sources = db.prepare(`
+    const sources = await db.prepare(`
       SELECT referrer_source as source, COUNT(*) as count
       FROM analytics_sessions
       WHERE referrer_source IS NOT NULL
       GROUP BY referrer_source ORDER BY count DESC
     `).all();
 
-    const referrers = db.prepare(`
+    const referrers = await db.prepare(`
       SELECT referrer, COUNT(*) as count
       FROM analytics_sessions
       WHERE referrer IS NOT NULL AND referrer != '' AND referrer_source = 'referral'
@@ -189,12 +190,12 @@ router.get("/referrers", (_req, res) => {
 });
 
 // ── GET /api/admin/analytics/live ────────────────────────────────────────
-router.get("/live", (_req, res) => {
+router.get("/live", async (_req, res) => {
   try {
     const threshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const count = (db.prepare(
+    const count = ((await db.prepare(
       "SELECT COUNT(DISTINCT visitor_id) as c FROM analytics_sessions WHERE last_seen >= ?"
-    ).get(threshold) as any).c;
+    ).get(threshold)) as any).c;
 
     res.json({ live: count });
   } catch (err) {

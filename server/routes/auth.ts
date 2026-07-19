@@ -46,7 +46,7 @@ function setAuthCookie(res: import("express").Response, token: string) {
   res.cookie("embr_token", token, COOKIE_OPTS);
 }
 
-router.post("/register", (req, res) => {
+router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -54,7 +54,7 @@ router.post("/register", (req, res) => {
   }
 
   const { name, email, password } = parsed.data;
-  const existing = db
+  const existing = await db
     .prepare("SELECT id FROM users WHERE email = ?")
     .get(email);
 
@@ -64,7 +64,7 @@ router.post("/register", (req, res) => {
   }
 
   const password_hash = bcrypt.hashSync(password, 10);
-  const result = db
+  const result = await db
     .prepare(
       "INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)",
     )
@@ -78,7 +78,7 @@ router.post("/register", (req, res) => {
   });
 });
 
-router.post("/login", (req, res) => {
+router.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -88,7 +88,7 @@ router.post("/login", (req, res) => {
   const emailOrPhone = (parsed.data.identifier ?? parsed.data.email ?? "").trim().toLowerCase();
   const { password } = parsed.data;
   const ip = req.ip || req.socket.remoteAddress || "unknown";
-  const user = db
+  const user = await db
     .prepare("SELECT id, email, name, password_hash, role FROM users WHERE lower(email) = ? OR phone = ?")
     .get(emailOrPhone, emailOrPhone) as
     | { id: number; email: string; name: string; password_hash: string; role: string }
@@ -116,7 +116,7 @@ router.post("/otp/request", async (req, res) => {
 
   const identifier = parsed.data.identifier.trim().toLowerCase();
   const channel = identifier.includes("@") ? "email" : "mobile";
-  const user = db
+  const user = await db
     .prepare("SELECT id, email, name, role FROM users WHERE lower(email) = ? OR phone = ? ORDER BY id DESC LIMIT 1")
     .get(identifier, identifier) as
     | { id: number; email: string; name: string; role: string }
@@ -131,7 +131,7 @@ router.post("/otp/request", async (req, res) => {
   const otpHash = bcrypt.hashSync(otp, 10);
   const destination = channel === "email" ? user.email : identifier;
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO otp_codes (user_id, identifier, channel, otp_hash, expires_at)
     VALUES (?, ?, ?, ?, datetime('now', '+10 minutes'))
   `).run(user.id, identifier, channel, otpHash);
@@ -164,7 +164,7 @@ router.post("/otp/request", async (req, res) => {
   res.json(responsePayload);
 });
 
-router.post("/otp/verify", (req, res) => {
+router.post("/otp/verify", async (req, res) => {
   const parsed = verifyOtpSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -172,7 +172,7 @@ router.post("/otp/verify", (req, res) => {
   }
 
   const identifier = parsed.data.identifier.trim().toLowerCase();
-  const otpRow = db.prepare(`
+  const otpRow = await db.prepare(`
     SELECT o.id, o.otp_hash, o.user_id, u.email, u.name, u.role
     FROM otp_codes o
     JOIN users u ON u.id = o.user_id
@@ -190,7 +190,7 @@ router.post("/otp/verify", (req, res) => {
     return;
   }
 
-  db.prepare("UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?").run(otpRow.id);
+  await db.prepare("UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?").run(otpRow.id);
   setSessionCookie(res, otpRow.user_id, otpRow.email, otpRow.role);
   logSuccessfulLogin(otpRow.email, req.ip || req.socket.remoteAddress || "unknown");
 
@@ -243,13 +243,13 @@ router.post("/google", async (req, res) => {
     const googleId = payload.sub;
     const ip = req.ip || req.socket.remoteAddress || "unknown";
 
-    let user = db.prepare("SELECT id, email, name, role FROM users WHERE lower(email) = ?").get(email) as
+    let user = await db.prepare("SELECT id, email, name, role FROM users WHERE lower(email) = ?").get(email) as
       | { id: number; email: string; name: string; role: string }
       | undefined;
 
     if (!user) {
       const password_hash = bcrypt.hashSync(crypto.randomUUID(), 10);
-      const result = db
+      const result = await db
         .prepare("INSERT INTO users (email, name, password_hash, google_id) VALUES (?, ?, ?, ?)")
         .run(email, name, password_hash, googleId);
       user = {
@@ -259,7 +259,7 @@ router.post("/google", async (req, res) => {
         role: "user",
       };
     } else if (googleId) {
-      db.prepare("UPDATE users SET google_id = COALESCE(google_id, ?), name = COALESCE(NULLIF(name, ''), ?) WHERE id = ?")
+      await db.prepare("UPDATE users SET google_id = COALESCE(google_id, ?), name = COALESCE(NULLIF(name, ''), ?) WHERE id = ?")
         .run(googleId, name, user.id);
     }
 

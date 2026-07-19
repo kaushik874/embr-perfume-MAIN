@@ -4,7 +4,7 @@ import { db } from "../db.js";
 
 const router = Router();
 
-router.post("/razorpay", (req, res) => {
+router.post("/razorpay", async (req, res) => {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) {
     console.warn("Webhook received but RAZORPAY_WEBHOOK_SECRET is not set.");
@@ -48,7 +48,7 @@ router.post("/razorpay", (req, res) => {
   const eventId = req.headers["x-razorpay-event-id"];
   if (eventId && typeof eventId === "string") {
     try {
-      const existing = db
+      const existing = await db
         .prepare("SELECT event_id FROM webhook_events WHERE event_id = ?")
         .get(eventId);
 
@@ -57,7 +57,7 @@ router.post("/razorpay", (req, res) => {
         res.status(200).send("OK");
         return;
       }
-      db.prepare("INSERT INTO webhook_events (event_id) VALUES (?)").run(eventId);
+      await db.prepare("INSERT INTO webhook_events (event_id) VALUES (?)").run(eventId);
     } catch (err) {
       console.error("Database error while checking webhook idempotency:", err);
       // We will proceed but this is risky if duplicate events actually process twice.
@@ -72,7 +72,7 @@ router.post("/razorpay", (req, res) => {
     const razorpay_payment_id = payment.id;
 
     if (razorpay_order_id) {
-      db.prepare(
+      await db.prepare(
         `UPDATE orders SET status = 'paid', razorpay_payment_id = ? WHERE razorpay_order_id = ? AND status != 'paid'`
       ).run(razorpay_payment_id, razorpay_order_id);
       console.log(`Webhook marked order ${razorpay_order_id} as paid.`);

@@ -3,7 +3,7 @@ import { db } from "../db.js";
 
 const router = Router();
 
-router.get("/customers", (req, res) => {
+router.get("/customers", async (req, res) => {
   const search = (req.query.search as string) || "";
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
@@ -18,11 +18,11 @@ router.get("/customers", (req, res) => {
     params.push(q, q, q);
   }
 
-  const countResult = db.prepare(
+  const countResult = await db.prepare(
     `SELECT COUNT(*) as total FROM users u ${where}`
   ).get(...params) as { total: number };
 
-  const customers = db.prepare(`
+  const customers = await db.prepare(`
     SELECT u.id, u.name, u.email, u.phone, u.created_at,
       (SELECT COUNT(*) FROM orders WHERE user_id = u.id) as order_count,
       (SELECT COALESCE(SUM(total_paise), 0) FROM orders WHERE user_id = u.id AND status IN ('paid','shipped','delivered')) as total_spent
@@ -43,8 +43,8 @@ router.get("/customers", (req, res) => {
   });
 });
 
-router.get("/customers/:id", (req, res) => {
-  const customer = db.prepare(`
+router.get("/customers/:id", async (req, res) => {
+  const customer = await db.prepare(`
     SELECT id, name, email, phone, created_at FROM users WHERE id = ? AND role = 'user'
   `).get(req.params.id);
 
@@ -53,7 +53,7 @@ router.get("/customers/:id", (req, res) => {
     return;
   }
 
-  const orders = db.prepare(`
+  const orders = await db.prepare(`
     SELECT id, status, total_paise, created_at, razorpay_payment_id,
            shipping_name, shipping_phone, shipping_address, shipping_city,
            shipping_state, shipping_pincode, tracking_number
@@ -61,7 +61,7 @@ router.get("/customers/:id", (req, res) => {
     ORDER BY created_at DESC
   `).all(req.params.id);
 
-  const addresses = db.prepare(`
+  const addresses = await db.prepare(`
     SELECT * FROM customer_addresses
     WHERE user_id = ?
     ORDER BY is_default DESC, updated_at DESC, id DESC

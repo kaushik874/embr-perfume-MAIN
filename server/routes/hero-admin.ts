@@ -71,8 +71,8 @@ function bannerValues(body: Record<string, unknown>, fallback?: HeroBannerRow) {
   };
 }
 
-router.get("/hero", (_req, res) => {
-  const banners = db.prepare("SELECT * FROM hero_banners ORDER BY displayOrder ASC").all();
+router.get("/hero", async (_req, res) => {
+  const banners = await db.prepare("SELECT * FROM hero_banners ORDER BY displayOrder ASC").all();
   res.json({ banners });
 });
 
@@ -105,7 +105,7 @@ router.post("/hero/upload", (req, res) => {
   }
 });
 
-router.post("/hero", (req, res) => {
+router.post("/hero", async (req, res) => {
   const values = bannerValues(req.body ?? {});
   if (!values.imageUrl) return res.status(400).json({ error: "Banner image is required" });
 
@@ -113,7 +113,7 @@ router.post("/hero", (req, res) => {
     INSERT INTO hero_banners (title, subtitle, description, imageUrl, productName, productUrl, badge, buttonText, buttonLink, showButton, darkOverlay, imageFit, imagePosition, mobileImagePosition, showText, isActive, displayOrder)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const info = stmt.run(
+  const info = await stmt.run(
     values.title,
     values.subtitle,
     values.description,
@@ -135,9 +135,9 @@ router.post("/hero", (req, res) => {
   res.json({ id: info.lastInsertRowid });
 });
 
-router.put("/hero/:id", (req, res) => {
+router.put("/hero/:id", async (req, res) => {
   const { id } = req.params;
-  const existing = db
+  const existing = await db
     .prepare("SELECT * FROM hero_banners WHERE id = ?")
     .get(id) as HeroBannerRow | undefined;
   if (!existing) return res.status(404).json({ error: "Banner not found" });
@@ -151,7 +151,7 @@ router.put("/hero/:id", (req, res) => {
       buttonText = ?, buttonLink = ?, showButton = ?, darkOverlay = ?, imageFit = ?, imagePosition = ?, mobileImagePosition = ?, showText = ?, isActive = ?, displayOrder = ?, updated_at = datetime('now')
     WHERE id = ?
   `);
-  stmt.run(
+  await stmt.run(
     values.title,
     values.subtitle,
     values.description,
@@ -174,20 +174,20 @@ router.put("/hero/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete("/hero/:id", (req, res) => {
-  db.prepare("DELETE FROM hero_banners WHERE id = ?").run(req.params.id);
+router.delete("/hero/:id", async (req, res) => {
+  await db.prepare("DELETE FROM hero_banners WHERE id = ?").run(req.params.id);
   res.json({ ok: true });
 });
 
-router.patch("/hero/reorder", (req, res) => {
+router.patch("/hero/reorder", async (req, res) => {
   const { orders } = req.body; // array of { id, displayOrder }
   if (!Array.isArray(orders)) return res.status(400).json({ error: "orders must be an array" });
   
   const stmt = db.prepare("UPDATE hero_banners SET displayOrder = ?, updated_at = datetime('now') WHERE id = ?");
-  db.transaction(() => {
+  await db.transaction(async () => {
     for (const o of orders) {
       const bannerId = intValue(o?.id, 0);
-      if (bannerId > 0) stmt.run(intValue(o?.displayOrder, 0), bannerId);
+      if (bannerId > 0) await stmt.run(intValue(o?.displayOrder, 0), bannerId);
     }
   })();
   res.json({ ok: true });

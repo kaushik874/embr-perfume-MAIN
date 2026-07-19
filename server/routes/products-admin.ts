@@ -12,12 +12,12 @@ function publicFilePath(url: string) {
   return path.join(process.cwd(), "public", url.replace(/^\//, ""));
 }
 
-function syncPrimaryProductImage(productId: string | number) {
-  const firstImage = db.prepare(
+async function syncPrimaryProductImage(productId: string | number) {
+  const firstImage = await db.prepare(
     "SELECT url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC LIMIT 1"
   ).get(productId) as { url: string } | undefined;
 
-  db.prepare("UPDATE products SET image = ? WHERE id = ?")
+  await db.prepare("UPDATE products SET image = ? WHERE id = ?")
     .run(firstImage?.url || null, productId);
 }
 
@@ -61,7 +61,7 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-router.get("/products", (req, res) => {
+router.get("/products", async (req, res) => {
   const search = (req.query.search as string) || "";
   const category = (req.query.category as string) || "";
   const status = (req.query.status as string) || "";
@@ -101,11 +101,11 @@ router.get("/products", (req, res) => {
   else if (sort === "name") orderBy = "ORDER BY name ASC";
   else if (sort === "stock") orderBy = "ORDER BY stock ASC";
 
-  const countResult = db.prepare(
+  const countResult = await db.prepare(
     `SELECT COUNT(*) as total FROM products ${where}`
   ).get(...params) as { total: number };
 
-  const products = db.prepare(
+  const products = await db.prepare(
     `SELECT * FROM products ${where} ${orderBy} LIMIT ? OFFSET ?`
   ).all(...params, limit, offset);
 
@@ -120,40 +120,40 @@ router.get("/products", (req, res) => {
   });
 });
 
-router.get("/products/categories", (_req, res) => {
-  const categories = db.prepare(
+router.get("/products/categories", async (_req, res) => {
+  const categories = await db.prepare(
     "SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != '' ORDER BY category ASC"
   ).all() as { category: string }[];
   res.json({ categories: categories.map((c) => c.category) });
 });
 
-router.get("/products/low-stock", (_req, res) => {
-  const products = db.prepare(
+router.get("/products/low-stock", async (_req, res) => {
+  const products = await db.prepare(
     "SELECT id, name, slug, stock, sku FROM products WHERE stock > 0 AND stock <= 5 ORDER BY stock ASC"
   ).all();
   res.json({ products });
 });
 
-router.get("/products/:id", (req, res) => {
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
+router.get("/products/:id", async (req, res) => {
+  const product = await db.prepare("SELECT * FROM products WHERE id = ?").get(req.params.id);
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
   }
-  const images = db.prepare(
+  const images = await db.prepare(
     "SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC"
   ).all(req.params.id);
   res.json({ product, images });
 });
 
-router.post("/products", (req, res) => {
+router.post("/products", async (req, res) => {
   const parsed = productSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
   try {
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO products (slug, name, notes, description, price, mrp, discount_price, stock, sku, category, status, tags, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review)
       VALUES (@slug, @name, @notes, @description, @price, @mrp, @discount_price, @stock, @sku, @category, @status, @tags, @image, 0, @collection_type, @bestseller, @key_features, @how_to_apply, @legal_information, @head_notes, @heart_notes, @base_notes, @review)
     `).run(parsed.data);
@@ -165,13 +165,13 @@ router.post("/products", (req, res) => {
   }
 });
 
-router.put("/products/:id", (req, res) => {
+router.put("/products/:id", async (req, res) => {
   const parsed = productSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
-  const result = db.prepare(`
+  const result = await db.prepare(`
     UPDATE products SET
       slug = @slug, name = @name, notes = @notes, description = @description,
       price = @price, mrp = @mrp, discount_price = @discount_price,
@@ -190,10 +190,10 @@ router.put("/products/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete("/products/:id", (req, res) => {
+router.delete("/products/:id", async (req, res) => {
   try {
-    db.prepare("DELETE FROM product_images WHERE product_id = ?").run(req.params.id);
-    const result = db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM product_images WHERE product_id = ?").run(req.params.id);
+    const result = await db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
     if (result.changes === 0) {
       res.status(404).json({ error: "Product not found" });
       return;
@@ -205,9 +205,9 @@ router.delete("/products/:id", (req, res) => {
   }
 });
 
-router.post("/products/:id/images", (req, res) => {
+router.post("/products/:id/images", async (req, res) => {
   try {
-    const product = db.prepare("SELECT id FROM products WHERE id = ?").get(req.params.id);
+    const product = await db.prepare("SELECT id FROM products WHERE id = ?").get(req.params.id);
     if (!product) {
       res.status(404).json({ error: "Product not found" });
       return;
@@ -220,13 +220,13 @@ router.post("/products/:id/images", (req, res) => {
     }
 
     // Check existing images count to enforce total limit
-    const existingCount = (db.prepare(
+    const existingCount = ((await db.prepare(
       "SELECT COUNT(*) as c FROM product_images WHERE product_id = ?"
-    ).get(req.params.id) as { c: number }).c;
+    ).get(req.params.id)) as { c: number }).c;
 
-    const maxSort = (db.prepare(
+    const maxSort = ((await db.prepare(
       "SELECT COALESCE(MAX(sort_order), -1) as m FROM product_images WHERE product_id = ?"
-    ).get(req.params.id) as { m: number }).m;
+    ).get(req.params.id)) as { m: number }).m;
 
     if (existingCount + images.length > MAX_PRODUCT_IMAGES) {
       res.status(400).json({
@@ -273,7 +273,7 @@ router.post("/products/:id/images", (req, res) => {
       const url = `/uploads/products/${filename}`;
       savedUrls.push(url);
 
-      db.prepare(
+      await db.prepare(
         "INSERT INTO product_images (product_id, url, sort_order) VALUES (?, ?, ?)"
       ).run(req.params.id, url, maxSort + 1 + i);
     }
@@ -283,7 +283,7 @@ router.post("/products/:id/images", (req, res) => {
       return;
     }
 
-    syncPrimaryProductImage(req.params.id);
+    await syncPrimaryProductImage(req.params.id);
 
     logAdminAction(req.user!.userId, "upload_images", `Uploaded ${savedUrls.length} images for product #${req.params.id}`);
     res.json({ images: savedUrls });
@@ -305,8 +305,8 @@ function hasImageSignature(buffer: Buffer, mimeType: string) {
   return false;
 }
 
-router.delete("/products/:id/images/:imageId", (req, res) => {
-  const image = db.prepare("SELECT url FROM product_images WHERE id = ? AND product_id = ?")
+router.delete("/products/:id/images/:imageId", async (req, res) => {
+  const image = await db.prepare("SELECT url FROM product_images WHERE id = ? AND product_id = ?")
     .get(req.params.imageId, req.params.id) as { url: string } | undefined;
 
   if (!image) {
@@ -319,14 +319,14 @@ router.delete("/products/:id/images/:imageId", (req, res) => {
     fs.unlinkSync(filepath);
   }
 
-  db.prepare("DELETE FROM product_images WHERE id = ?").run(req.params.imageId);
+  await db.prepare("DELETE FROM product_images WHERE id = ?").run(req.params.imageId);
 
-  syncPrimaryProductImage(req.params.id);
+  await syncPrimaryProductImage(req.params.id);
 
   res.json({ ok: true });
 });
 
-router.patch("/products/:id/images/order", (req, res) => {
+router.patch("/products/:id/images/order", async (req, res) => {
   const schema = z.object({
     imageIds: z.array(z.number().int().positive()).min(1),
   });
@@ -336,13 +336,13 @@ router.patch("/products/:id/images/order", (req, res) => {
     return;
   }
 
-  const product = db.prepare("SELECT id FROM products WHERE id = ?").get(req.params.id);
+  const product = await db.prepare("SELECT id FROM products WHERE id = ?").get(req.params.id);
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
   }
 
-  const existing = db.prepare(
+  const existing = await db.prepare(
     "SELECT id FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC"
   ).all(req.params.id) as { id: number }[];
 
@@ -357,26 +357,26 @@ router.patch("/products/:id/images/order", (req, res) => {
     return;
   }
 
-  db.transaction(() => {
-    parsed.data.imageIds.forEach((imageId, index) => {
-      db.prepare("UPDATE product_images SET sort_order = ? WHERE id = ? AND product_id = ?")
+  await db.transaction(async () => {
+    for (const [index, imageId] of parsed.data.imageIds.entries()) {
+      await db.prepare("UPDATE product_images SET sort_order = ? WHERE id = ? AND product_id = ?")
         .run(index, imageId, req.params.id);
-    });
+    }
   })();
 
-  syncPrimaryProductImage(req.params.id);
+  await syncPrimaryProductImage(req.params.id);
   logAdminAction(req.user!.userId, "reorder_images", `Reordered images for product #${req.params.id}`);
   res.json({ ok: true });
 });
 
-router.patch("/products/:id/stock", (req, res) => {
+router.patch("/products/:id/stock", async (req, res) => {
   const schema = z.object({ stock: z.number().int().nonnegative() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
-  const result = db.prepare("UPDATE products SET stock = ? WHERE id = ?")
+  const result = await db.prepare("UPDATE products SET stock = ? WHERE id = ?")
     .run(parsed.data.stock, req.params.id);
   if (result.changes === 0) {
     res.status(404).json({ error: "Product not found" });
