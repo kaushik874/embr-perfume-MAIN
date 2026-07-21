@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
-import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
 import { api, type Product } from "@/lib/api";
 import { getCatalogProduct } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
+import { useWishlist } from "@/hooks/useWishlist";
 import { ShopLayout } from "@/components/layout/ShopLayout";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { toast } from "sonner";
@@ -41,12 +42,14 @@ function splitNotes(value?: string | null) {
 function SectionShell({
   children,
   className = "",
+  noMargin = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  noMargin?: boolean;
 }) {
   return (
-    <section className={`w-full ${className}`} style={{ marginTop: "var(--section-gap)" }}>
+    <section className={`w-full ${className}`} style={noMargin ? {} : { marginTop: "var(--section-gap)" }}>
       {children}
     </section>
   );
@@ -148,7 +151,7 @@ function ProductGallery({
   const hasThumbnails = galleryImages.length > 1;
 
   return (
-    <SectionShell className="lg:mt-0">
+    <SectionShell className="lg:mt-0" noMargin={true}>
       <div
         className={`grid gap-4 ${
           hasThumbnails ? "lg:grid-cols-[var(--thumb-size)_minmax(0,1fr)]" : "lg:grid-cols-1"
@@ -200,8 +203,9 @@ function ProductInfo({
   setQuantity,
   discount,
   noteList,
-}: SectionRenderContext) {
+  }: SectionRenderContext) {
   const { add } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const category =
     "category" in product && product.category
       ? String(product.category)
@@ -223,14 +227,22 @@ function ProductInfo({
   const reviewCount = reviews.length;
 
   return (
-    <SectionShell className="lg:mt-0">
+    <SectionShell className="lg:mt-0" noMargin={true}>
       <div className="flex h-full flex-col justify-center">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ink-muted">
           {category}
         </p>
-        <h1 className="mt-3 font-display text-5xl uppercase leading-none text-ink sm:text-6xl lg:text-7xl">
-          {product.name}
-        </h1>
+        <div className="mt-3 flex items-start justify-between gap-4">
+          <h1 className="font-display text-5xl uppercase leading-none text-ink sm:text-6xl lg:text-7xl">
+            {product.name}
+          </h1>
+          <button
+            onClick={() => toggleWishlist(product.id)}
+            className="mt-2 shrink-0 rounded-full bg-white p-2.5 text-gray-400 shadow-sm transition-all hover:scale-110 hover:text-red-500"
+          >
+            <Heart className={`h-6 w-6 ${isWishlisted(product.id) ? "fill-red-500 text-red-500" : ""}`} />
+          </button>
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-ink">
           <Star className="h-4 w-4 fill-gold-deep text-gold-deep" />
@@ -256,10 +268,6 @@ function ProductInfo({
         <p className="mt-1 text-xs uppercase tracking-wide text-ink-muted">
           {productPageSettings.text.priceLabel}
         </p>
-
-        <div className="mt-4 inline-flex w-fit items-center border border-gold-deep bg-gold-deep/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-ink">
-          {productPageSettings.text.offerText}
-        </div>
 
         <p className="mt-7 max-w-xl text-[15px] leading-[var(--line-height)] text-ink-muted">
           {product.description || productPageSettings.text.shortDescriptionFallback}
@@ -626,13 +634,13 @@ export function ProductPage() {
       >
         <Link
           href="/collections"
-          className="mb-8 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-muted hover:text-gold-deep"
+          className="mb-4 lg:mb-8 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-muted hover:text-gold-deep"
         >
           <ChevronLeft className="h-4 w-4" />
           {productPageSettings.text.backToCollections}
         </Link>
 
-        <div className="grid items-start gap-[var(--section-gap)] lg:grid-cols-2 lg:gap-[var(--column-gap)]">
+        <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-[var(--column-gap)]">
           {heroIds.map((id) => renderSection(id, context))}
         </div>
 

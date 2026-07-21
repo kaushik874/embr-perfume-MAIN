@@ -62,7 +62,7 @@ export function Hero() {
   return (
     <>
       <Header variant="light" />
-      <section className="relative aspect-[4/3] sm:aspect-auto sm:min-h-[calc(100svh-5rem)] w-full overflow-hidden bg-page group">
+      <section className="relative h-[85svh] sm:h-auto sm:aspect-auto sm:min-h-[calc(100svh-5rem)] w-full overflow-hidden bg-page group">
 
       {/* Background Images Carousel */}
       <div className="absolute inset-0 z-0">
@@ -73,13 +73,16 @@ export function Hero() {
               i === current ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
-            <img
-              src={b.imageUrl}
-              alt={b.title || "Hero Banner"}
-              fetchPriority={i === 0 ? "high" : "auto"}
-              style={imageStyle(b)}
-              className="h-full w-full object-cover [object-position:var(--hero-mobile-position)] md:[object-position:var(--hero-desktop-position)]"
-            />
+            <picture>
+              <source media="(max-width: 639px)" srcSet={b.mobileImageUrl || b.imageUrl} />
+              <img
+                src={b.imageUrl}
+                alt={b.title || "Hero Banner"}
+                fetchPriority={i === 0 ? "high" : "auto"}
+                style={imageStyle(b)}
+                className="h-full w-full object-cover [object-position:var(--hero-mobile-position)] md:[object-position:var(--hero-desktop-position)]"
+              />
+            </picture>
             {b.darkOverlay === 1 && (
               <div className="absolute inset-0 bg-black/25 sm:bg-gradient-to-r sm:from-black/55 sm:via-black/20 sm:to-transparent" />
             )}
@@ -88,46 +91,50 @@ export function Hero() {
       </div>
 
       {/* Content Overlay */}
-      <div className="relative z-10 mx-auto flex h-full sm:min-h-[calc(100svh-5rem)] max-w-7xl flex-col justify-center px-4 sm:px-6 md:px-10 py-4 sm:pb-16 sm:pt-16 pointer-events-none">
+      <div className="relative z-10 mx-auto flex h-full sm:min-h-[calc(100svh-5rem)] max-w-7xl flex-col justify-start sm:justify-center items-center sm:items-start text-center sm:text-left px-4 sm:px-6 md:px-10 pt-16 sm:pb-16 sm:pt-16 pointer-events-none">
         {activeBanner.showText === 1 && (
-          <div className="max-w-[min(90vw,34rem)] animate-fade-in space-y-1.5 sm:max-w-2xl sm:space-y-6 pointer-events-auto">
+          <div className="max-w-[90vw] sm:max-w-2xl flex flex-col items-center sm:items-start animate-fade-in space-y-2.5 sm:space-y-6 pointer-events-auto mt-4 sm:mt-0">
             {activeBanner.subtitle && (
-              <p className="font-display text-[8px] sm:text-sm tracking-[0.2em] sm:tracking-[0.4em] text-gold-deep uppercase">
+              <p className="font-display text-[10px] sm:text-sm tracking-[0.25em] sm:tracking-[0.4em] text-gold-deep uppercase">
                 {activeBanner.subtitle}
               </p>
             )}
             
             {activeBanner.title && (
-              <h1 className="font-serif text-3xl leading-[1.05] text-white sm:text-6xl md:text-7xl lg:text-8xl drop-shadow-lg">
+              <h1 className="font-serif text-[2.5rem] leading-[1.05] text-white sm:text-6xl md:text-7xl lg:text-8xl drop-shadow-lg">
                 <span dangerouslySetInnerHTML={{ __html: activeBanner.title.replace(/\*(.*?)\*/g, '<em class="italic text-gold-deep">$1</em>') }} />
               </h1>
             )}
             
             {activeBanner.description && (
-              <p className="max-w-[85vw] text-[11px] leading-snug text-gray-100 sm:max-w-md sm:text-lg sm:leading-relaxed drop-shadow-md">
+              <p className="max-w-[85vw] text-xs leading-snug text-gray-100 sm:max-w-md sm:text-lg sm:leading-relaxed drop-shadow-md">
                 {activeBanner.description}
               </p>
             )}
 
             {activeBanner.productName && (
-              <p className="font-display text-[8px] tracking-[0.2em] text-white/85 uppercase sm:text-sm sm:tracking-[0.25em]">
+              <p className="font-display text-[10px] tracking-[0.2em] text-white/85 uppercase sm:text-sm sm:tracking-[0.25em]">
                 {activeBanner.productName}
               </p>
             )}
 
-            <div className="flex flex-col gap-3 pt-2 sm:pt-6 sm:flex-row">
+            <div className="flex flex-col gap-3 pt-3 sm:pt-6 sm:flex-row">
               {showShopButton && (
                  shopLink.startsWith("/") ? (
-                   <Link href={shopLink}>
-                    <button className="min-h-10 w-auto rounded-full bg-gradient-gold px-5 py-2 text-[11px] font-medium tracking-wide text-charcoal shadow-gold transition-all hover:scale-[1.03] sm:min-h-14 sm:px-8 sm:py-4 sm:text-base">
-                      {activeBanner.buttonText || "Shop Now"}
-                    </button>
+                   <Link 
+                     href={shopLink}
+                     className="min-h-12 w-fit flex items-center justify-center rounded-full bg-gradient-gold px-8 py-3 text-xs font-medium tracking-widest text-charcoal shadow-gold transition-all hover:scale-[1.03] sm:min-h-14 sm:px-8 sm:py-4 sm:text-base"
+                   >
+                     {activeBanner.buttonText || "Shop Now"}
                    </Link>
                  ) : (
-                   <a href={shopLink} target="_blank" rel="noopener noreferrer">
-                    <button className="min-h-10 w-auto rounded-full bg-gradient-gold px-5 py-2 text-[11px] font-medium tracking-wide text-charcoal shadow-gold transition-all hover:scale-[1.03] sm:min-h-14 sm:px-8 sm:py-4 sm:text-base">
-                      {activeBanner.buttonText || "Shop Now"}
-                    </button>
+                   <a 
+                     href={shopLink} 
+                     target="_blank" 
+                     rel="noopener noreferrer"
+                     className="min-h-12 w-fit flex items-center justify-center rounded-full bg-gradient-gold px-8 py-3 text-xs font-medium tracking-widest text-charcoal shadow-gold transition-all hover:scale-[1.03] sm:min-h-14 sm:px-8 sm:py-4 sm:text-base"
+                   >
+                     {activeBanner.buttonText || "Shop Now"}
                    </a>
                  )
               )}

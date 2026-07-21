@@ -2,8 +2,18 @@ import { useEffect, useState, useCallback } from "react";
 import { adminApi, type ProductFull, type Pagination } from "@/lib/admin-api";
 import { AdminLayout } from "./AdminLayout";
 import { ImageUpload } from "@/components/admin/ImageUpload";
+import { ImageCropperModal } from "@/components/admin/ImageCropper";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Crop } from "lucide-react";
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Could not read the image"));
+    reader.readAsDataURL(file);
+  });
+}
 
 interface ProductForm {
   slug: string;
@@ -56,6 +66,7 @@ export function AdminProducts() {
   const [loadingImages, setLoadingImages] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [savingImageOrder, setSavingImageOrder] = useState(false);
+  const [croppingImage, setCroppingImage] = useState<{ id: number; url: string; index: number } | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -96,6 +107,47 @@ export function AdminProducts() {
       toast.error(err.message);
     } finally {
       setLoadingImages(false);
+    }
+  };
+
+  const handleSaveCrop = async (croppedBlob: Blob) => {
+    if (!croppingImage || showImages === null) return;
+    setSavingImageOrder(true);
+    try {
+      const fileName = `crop-${Date.now()}.webp`;
+      // Convert blob to raw base64 (strip "data:image/webp;base64," prefix) — server expects raw base64
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(croppedBlob);
+      });
+
+      // 1. Upload the newly cropped image
+      await adminApi.uploadImages(showImages, [{ name: fileName, type: "image/webp", data: dataUrl }]);
+
+      // 2. Reload images to get the new image's id
+      const freshRes = await adminApi.product(showImages);
+      const freshImages = (freshRes.images || []).sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+      const newImg = freshImages.find((img) => img.id !== croppingImage.id && !existingImages.some((e) => e.id === img.id));
+
+      // 3. Reorder so the cropped image takes the original's slot
+      if (newImg) {
+        const orderedIds = freshImages.map((img) => img.id).filter((id) => id !== newImg.id);
+        orderedIds.splice(croppingImage.index, 0, newImg.id);
+        await adminApi.reorderImages(showImages, orderedIds);
+      }
+
+      // 4. Delete the original image
+      await adminApi.deleteImage(showImages, croppingImage.id);
+
+      toast.success("Image cropped and saved!");
+      setCroppingImage(null);
+      await openImages(showImages);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save cropped image");
+    } finally {
+      setSavingImageOrder(false);
     }
   };
 
@@ -352,8 +404,8 @@ export function AdminProducts() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Type / Category</label>
+                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="e.g. Extrait de Parfum"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
               </div>
               <div>
@@ -505,17 +557,26 @@ export function AdminProducts() {
                           </button>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteImage(showImages, img.id)}
-                        disabled={deletingImageId === img.id}
-                        className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-start justify-end p-1 opacity-0 group-hover:opacity-100"
-                        title="Delete image"
-                      >
-                        {deletingImageId === img.id
-                          ? <span className="text-white text-xs">Deleting...</span>
-                          : <Trash2 className="w-4 h-4 text-white drop-shadow" />
-                        }
-                      </button>
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-start justify-end gap-2 p-2 opacity-0 group-hover:opacity-100">
+                        <button
+                          onClick={() => setCroppingImage({ id: img.id, url: img.url, index: idx })}
+                          className="bg-blue-600/90 hover:bg-blue-600 text-white rounded p-1.5 shadow-sm"
+                          title="Crop image"
+                        >
+                          <Crop className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteImage(showImages, img.id)}
+                          disabled={deletingImageId === img.id}
+                          className="bg-red-600/90 hover:bg-red-600 text-white rounded p-1.5 shadow-sm"
+                          title="Delete image"
+                        >
+                          {deletingImageId === img.id
+                            ? <span className="text-white text-[10px]">Deleting...</span>
+                            : <Trash2 className="w-4 h-4" />
+                          }
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -645,6 +706,16 @@ export function AdminProducts() {
             Next
           </button>
         </div>
+      )}
+
+      {croppingImage && (
+        <ImageCropperModal
+          imageUrl={croppingImage.url}
+          title="Crop Product Image"
+          description="Drag the box to select the area to keep. No aspect ratio is locked — crop freely."
+          onSave={handleSaveCrop}
+          onCancel={() => setCroppingImage(null)}
+        />
       )}
     </AdminLayout>
   );

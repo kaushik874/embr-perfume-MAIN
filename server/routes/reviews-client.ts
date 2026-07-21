@@ -56,6 +56,7 @@ router.get("/:slug", async (req, res) => {
     LEFT JOIN users u ON r.user_id = u.id
     WHERE r.product_id = ? AND r.is_hidden = 0 AND r.status = 'approved'
     ORDER BY r.is_pinned DESC, r.is_featured DESC, ${orderClause}
+    LIMIT 100
   `).all(product.id) as any[];
 
   // Parse JSON strings
@@ -88,16 +89,16 @@ router.get("/eligibility/:slug", requireAuth, async (req, res) => {
     LIMIT 1
   `).get(userId, product.id) as { id: number } | undefined;
 
-  // Find if user already reviewed
-  const existingReview = await db.prepare(`
-    SELECT id FROM reviews WHERE user_id = ? AND product_id = ?
-  `).get(userId, product.id) as { id: number } | undefined;
+  // Find if user reached max reviews (5)
+  const existingReviewsCount = (await db.prepare(`
+    SELECT COUNT(*) as count FROM reviews WHERE user_id = ? AND product_id = ?
+  `).get(userId, product.id) as { count: number }).count;
 
   res.json({
     eligible: !!eligibleOrder,
-    hasReviewed: !!existingReview,
+    hasReviewed: existingReviewsCount >= 5,
     orderId: eligibleOrder?.id,
-    reviewId: existingReview?.id
+    reviewId: null // We don't rely on this for editing anymore, we'll edit directly from the list
   });
 });
 
@@ -156,7 +157,7 @@ function saveMediaFiles(files: any[]) {
   return { savedImages, savedVideo };
 }
 
-// POST /api/reviews/:slug - Submit review
+// POST /api/reviews/:slug - Create a new review
 router.post("/:slug", requireAuth, async (req, res) => {
   const userId = req.user!.userId;
   const product = await db.prepare("SELECT id FROM products WHERE slug = ?").get(req.params.slug) as { id: number } | undefined;
@@ -166,13 +167,7 @@ router.post("/:slug", requireAuth, async (req, res) => {
     return;
   }
 
-  const parsed = reviewSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.flatten() });
-    return;
-  }
-
-  // Verify eligibility
+  // Check if eligible
   const eligibleOrder = await db.prepare(`
     SELECT o.id 
     FROM orders o
@@ -186,13 +181,19 @@ router.post("/:slug", requireAuth, async (req, res) => {
     return;
   }
 
-  // Check existing
-  const existingReview = await db.prepare(`
-    SELECT id FROM reviews WHERE user_id = ? AND product_id = ?
-  `).get(userId, product.id) as { id: number } | undefined;
+  // Max 5 reviews check
+  const reviewCount = (await db.prepare(`
+    SELECT COUNT(*) as count FROM reviews WHERE user_id = ? AND product_id = ?
+  `).get(userId, product.id) as { count: number }).count;
 
-  if (existingReview) {
-    res.status(400).json({ error: "You have already reviewed this product." });
+  if (reviewCount >= 5) {
+    res.status(400).json({ error: "You have reached the maximum of 5 reviews for this product." });
+    return;
+  }
+
+  const parsed = reviewSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
 
@@ -200,7 +201,7 @@ router.post("/:slug", requireAuth, async (req, res) => {
 
   const result = await db.prepare(`
     INSERT INTO reviews (product_id, user_id, order_id, rating, title, comment, images, video, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved')
   `).run(
     product.id,
     userId,
@@ -245,7 +246,7 @@ router.put("/:id", requireAuth, async (req, res) => {
 
   await db.prepare(`
     UPDATE reviews 
-    SET rating = ?, title = ?, comment = ?, images = ?, video = ?, status = 'pending'
+    SET rating = ?, title = ?, comment = ?, images = ?, video = ?, status = 'approved'
     WHERE id = ?
   `).run(
     parsed.data.rating,
@@ -257,6 +258,27 @@ router.put("/:id", requireAuth, async (req, res) => {
   );
 
   res.json({ ok: true });
+});
+
+// DELETE /api/reviews/:id - Delete own review
+router.delete("/:id", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const reviewId = req.params.id;
+
+  const existing = await db.prepare("SELECT id, user_id FROM reviews WHERE id = ?").get(reviewId) as { id: number, user_id: number } | undefined;
+  
+  if (!existing) {
+    res.status(404).json({ error: "Review not found" });
+    return;
+  }
+
+  if (existing.user_id !== userId) {
+    res.status(403).json({ error: "You can only delete your own reviews" });
+    return;
+  }
+
+  await db.prepare("DELETE FROM reviews WHERE id = ?").run(reviewId);
+  res.json({ success: true });
 });
 
 export default router;

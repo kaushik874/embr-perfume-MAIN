@@ -4,13 +4,14 @@ import { Button } from "./ui/button";
 
 interface ReviewFormProps {
   slug: string;
-  initialData?: any; // If editing
-  orderId?: number | null; // For new review creation
+  orderId?: number | null;
+  initialData?: any;
+  reviewId?: number;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function ReviewForm({ slug, initialData, orderId, onSuccess, onCancel }: ReviewFormProps) {
+export function ReviewForm({ slug, orderId, initialData, reviewId, onSuccess, onCancel }: ReviewFormProps) {
   const [rating, setRating] = useState(initialData?.rating || 5);
   const [title, setTitle] = useState(initialData?.title || "");
   const [comment, setComment] = useState(initialData?.comment || "");
@@ -90,11 +91,12 @@ export function ReviewForm({ slug, initialData, orderId, onSuccess, onCancel }: 
         mediaFiles 
       };
 
-      const url = initialData 
-        ? `/api/reviews/${initialData.id}`
+      const effectiveReviewId = initialData?.id || reviewId;
+      const url = effectiveReviewId 
+        ? `/api/reviews/${effectiveReviewId}`
         : `/api/reviews/${slug}`;
 
-      const method = initialData ? "PUT" : "POST";
+      const method = effectiveReviewId ? "PUT" : "POST";
 
       const res = await fetch(url, {
         method,

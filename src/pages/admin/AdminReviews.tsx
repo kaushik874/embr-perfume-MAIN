@@ -107,121 +107,126 @@ export function AdminReviews() {
         </Button>
       </div>
       
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {reviews.map((r) => (
-          <div key={r.id} className={`bg-white dark:bg-gray-950 p-6 rounded-lg border shadow-sm ${r.is_hidden ? 'opacity-70 border-dashed' : 'border-gray-200 dark:border-gray-800'}`}>
-            <div className="flex flex-col lg:flex-row gap-6">
+          <div key={r.id} className={`bg-white dark:bg-gray-950 p-3 flex flex-col rounded-lg border shadow-sm ${r.is_hidden ? 'opacity-70 border-dashed' : 'border-gray-200 dark:border-gray-800'}`}>
+            <div className="flex flex-col gap-3 flex-1">
               {/* Product Info */}
-              <div className="w-full lg:w-48 flex-shrink-0 text-sm">
-                {r.product_image && <img src={r.product_image} alt="product" className="w-full h-32 object-cover rounded mb-2 border" />}
-                <p className="font-semibold">{r.product_name}</p>
-                <p className="text-gray-500">ID: #{r.id}</p>
-                {r.order_id && <p className="text-gray-500">Order: #{r.order_id}</p>}
-                <p className="text-gray-500">{new Date(r.created_at).toLocaleDateString()}</p>
+              <div className="w-full text-xs">
+                {r.product_image && <img src={r.product_image} alt="product" className="w-full h-24 object-cover rounded mb-1 border" />}
+                <p className="font-semibold truncate" title={r.product_name}>{r.product_name}</p>
+                <div className="flex flex-wrap gap-2 text-gray-500">
+                  <span>ID: #{r.id}</span>
+                  {r.order_id && <span>Order: #{r.order_id}</span>}
+                  <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                </div>
               </div>
 
               {/* Review Content */}
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="flex text-yellow-500">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className={`w-4 h-4 ${i < r.rating ? 'fill-current' : 'text-gray-300 dark:text-gray-700'}`} />
-                    ))}
-                  </div>
-                  <h3 className="font-bold text-lg">{r.title}</h3>
-                  
-                  {/* Status Badges */}
-                  <div className="ml-auto flex gap-2">
-                    {r.is_pinned === 1 && <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded flex items-center"><Pin className="w-3 h-3 mr-1"/> Pinned</span>}
-                    {r.is_featured === 1 && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded flex items-center"><Award className="w-3 h-3 mr-1"/> Featured</span>}
-                    {r.is_hidden === 1 && <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded flex items-center"><EyeOff className="w-3 h-3 mr-1"/> Hidden</span>}
-                    <span className={`text-xs px-2 py-1 rounded flex items-center ${r.status === 'approved' ? 'bg-green-100 text-green-800' : r.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+              <div className="flex-1 flex flex-col">
+                <div className="flex flex-col gap-1 mb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex text-yellow-500">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className={`w-3 h-3 ${i < r.rating ? 'fill-current' : 'text-gray-300 dark:text-gray-700'}`} />
+                      ))}
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded flex items-center ${r.status === 'approved' ? 'bg-green-100 text-green-800' : r.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
                       {r.status}
                     </span>
                   </div>
+                  <h3 className="font-bold text-sm line-clamp-2" title={r.title}>{r.title}</h3>
+                  
+                  {/* Status Badges */}
+                  <div className="flex flex-wrap gap-1">
+                    {r.is_pinned === 1 && <span className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded flex items-center"><Pin className="w-2.5 h-2.5 mr-0.5"/> Pinned</span>}
+                    {r.is_featured === 1 && <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.5 rounded flex items-center"><Award className="w-2.5 h-2.5 mr-0.5"/> Featured</span>}
+                    {r.is_hidden === 1 && <span className="bg-gray-100 text-gray-800 text-[10px] px-1.5 py-0.5 rounded flex items-center"><EyeOff className="w-2.5 h-2.5 mr-0.5"/> Hidden</span>}
+                  </div>
                 </div>
 
-                <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 leading-tight">
                   By <span className="font-semibold text-gray-900 dark:text-white">{r.customer_name || r.user_name || "Guest"}</span> 
-                  {(r.customer_email || r.user_email) && ` (${r.customer_email || r.user_email})`}
-                  {r.customer_phone && ` • ${r.customer_phone}`}
+                  {(r.customer_email || r.user_email) && <span className="block truncate" title={r.customer_email || r.user_email}>{r.customer_email || r.user_email}</span>}
+                  {r.customer_phone && <span className="block">{r.customer_phone}</span>}
                 </div>
 
-                <p className="text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap">{r.comment}</p>
+                <p className="text-xs text-gray-700 dark:text-gray-300 mb-3 whitespace-pre-wrap line-clamp-4">{r.comment}</p>
 
                 {/* Media */}
-                <div className="flex gap-2 overflow-x-auto mb-4">
+                <div className="flex gap-1 overflow-x-auto mb-3 pb-1">
                   {r.video && (
-                    <video src={r.video} controls className="w-24 h-24 object-cover rounded border" />
+                    <video src={r.video} controls className="w-16 h-16 shrink-0 object-cover rounded border" />
                   )}
                   {r.images?.map((img: string, i: number) => (
-                    <img key={i} src={img} className="w-24 h-24 object-cover rounded border" alt="" />
+                    <img key={i} src={img} className="w-16 h-16 shrink-0 object-cover rounded border" alt="" />
                   ))}
                 </div>
 
                 {/* Reply */}
                 {r.reply ? (
-                  <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded text-sm mb-4 border">
-                    <p className="font-semibold mb-1">Your Reply:</p>
-                    <p>{r.reply}</p>
-                    <button onClick={() => {setReplyingTo(r.id); setReplyText(r.reply);}} className="text-blue-600 text-xs mt-2">Edit Reply</button>
+                  <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs mb-3 border">
+                    <p className="font-semibold mb-0.5">Your Reply:</p>
+                    <p className="line-clamp-2" title={r.reply}>{r.reply}</p>
+                    <button onClick={() => {setReplyingTo(r.id); setReplyText(r.reply);}} className="text-blue-600 text-[10px] mt-1">Edit Reply</button>
                   </div>
                 ) : (
                   replyingTo !== r.id && (
-                    <button onClick={() => setReplyingTo(r.id)} className="text-blue-600 text-sm flex items-center mb-4">
-                      <MessageSquare className="w-4 h-4 mr-1" /> Add Reply
+                    <button onClick={() => setReplyingTo(r.id)} className="text-blue-600 text-xs flex items-center mb-3">
+                      <MessageSquare className="w-3 h-3 mr-1" /> Add Reply
                     </button>
                   )
                 )}
 
                 {replyingTo === r.id && (
-                  <div className="flex gap-2 mt-2 mb-4">
-                    <input 
-                      type="text" 
+                  <div className="flex flex-col gap-1 mt-1 mb-3">
+                    <textarea 
                       value={replyText} 
                       onChange={e => setReplyText(e.target.value)} 
-                      placeholder="Write your response..." 
-                      className="flex-1 p-2 border rounded text-sm"
+                      placeholder="Response..." 
+                      className="w-full p-1.5 border rounded text-xs min-h-[60px]"
                     />
-                    <Button onClick={() => submitReply(r.id)} size="sm">Save</Button>
-                    <Button onClick={() => setReplyingTo(null)} variant="outline" size="sm">Cancel</Button>
+                    <div className="flex gap-1">
+                      <Button onClick={() => submitReply(r.id)} size="sm" className="h-6 text-[10px] px-2 py-0">Save</Button>
+                      <Button onClick={() => setReplyingTo(null)} variant="outline" size="sm" className="h-6 text-[10px] px-2 py-0">Cancel</Button>
+                    </div>
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex flex-wrap gap-2 pt-3 border-t">
+                <div className="flex flex-wrap gap-1 pt-2 border-t mt-auto">
                   {r.status !== 'approved' && (
-                    <Button variant="outline" size="sm" onClick={() => handleStatus(r.id, 'approved')} className="text-green-600 border-green-200 hover:bg-green-50">
-                      <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                    <Button variant="outline" size="sm" onClick={() => handleStatus(r.id, 'approved')} className="h-6 text-[10px] px-1.5 py-0 text-green-600 border-green-200 hover:bg-green-50 flex-1">
+                      <CheckCircle className="w-3 h-3 mr-1" /> Approve
                     </Button>
                   )}
                   {r.status !== 'rejected' && (
-                    <Button variant="outline" size="sm" onClick={() => handleStatus(r.id, 'rejected')} className="text-red-600 border-red-200 hover:bg-red-50">
-                      <XCircle className="w-4 h-4 mr-1" /> Reject
+                    <Button variant="outline" size="sm" onClick={() => handleStatus(r.id, 'rejected')} className="h-6 text-[10px] px-1.5 py-0 text-red-600 border-red-200 hover:bg-red-50 flex-1">
+                      <XCircle className="w-3 h-3 mr-1" /> Reject
                     </Button>
                   )}
                   
-                  <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
+                  <div className="w-full h-px bg-gray-100 my-0.5" />
 
-                  <Button variant="outline" size="sm" onClick={() => handleToggleFlag(r.id, 'is_pinned', r.is_pinned)}>
-                    <Pin className={`w-4 h-4 mr-1 ${r.is_pinned ? 'fill-current' : ''}`} /> {r.is_pinned ? 'Unpin' : 'Pin'}
+                  <Button variant="outline" size="sm" onClick={() => handleToggleFlag(r.id, 'is_pinned', r.is_pinned)} className="h-6 text-[10px] px-1.5 py-0 flex-1">
+                    <Pin className={`w-3 h-3 mr-1 ${r.is_pinned ? 'fill-current' : ''}`} /> {r.is_pinned ? 'Unpin' : 'Pin'}
                   </Button>
                   
-                  <Button variant="outline" size="sm" onClick={() => handleToggleFlag(r.id, 'is_featured', r.is_featured)}>
-                    <Award className={`w-4 h-4 mr-1 ${r.is_featured ? 'fill-current' : ''}`} /> {r.is_featured ? 'Unfeature' : 'Feature'}
+                  <Button variant="outline" size="sm" onClick={() => handleToggleFlag(r.id, 'is_featured', r.is_featured)} className="h-6 text-[10px] px-1.5 py-0 flex-1">
+                    <Award className={`w-3 h-3 mr-1 ${r.is_featured ? 'fill-current' : ''}`} /> {r.is_featured ? 'Unfeat' : 'Feat'}
                   </Button>
 
-                  <Button variant="outline" size="sm" onClick={() => handleToggleFlag(r.id, 'is_hidden', r.is_hidden)}>
-                    {r.is_hidden ? <><Eye className="w-4 h-4 mr-1" /> Show</> : <><EyeOff className="w-4 h-4 mr-1" /> Hide</>}
+                  <Button variant="outline" size="sm" onClick={() => handleToggleFlag(r.id, 'is_hidden', r.is_hidden)} className="h-6 text-[10px] px-1.5 py-0 flex-1">
+                    {r.is_hidden ? <><Eye className="w-3 h-3 mr-1" /> Show</> : <><EyeOff className="w-3 h-3 mr-1" /> Hide</>}
                   </Button>
 
-                  <div className="w-px h-6 bg-gray-200 mx-1 self-center" />
+                  <div className="w-full h-px bg-gray-100 my-0.5" />
 
-                  <Button variant="outline" size="sm" onClick={() => {setEditingReview(r); setShowForm(true);}}>
-                    <Edit2 className="w-4 h-4 mr-1" /> Edit
+                  <Button variant="outline" size="sm" onClick={() => {setEditingReview(r); setShowForm(true);}} className="h-6 text-[10px] px-1.5 py-0 flex-1">
+                    <Edit2 className="w-3 h-3 mr-1" /> Edit
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(r.id)} className="text-red-600 border-red-200 hover:bg-red-50">
-                    <Trash2 className="w-4 h-4 mr-1" /> Delete
+                  <Button variant="outline" size="sm" onClick={() => handleDelete(r.id)} className="h-6 text-[10px] px-1.5 py-0 text-red-600 border-red-200 hover:bg-red-50 flex-1">
+                    <Trash2 className="w-3 h-3 mr-1" /> Delete
                   </Button>
                 </div>
 

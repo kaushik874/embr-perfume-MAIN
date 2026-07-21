@@ -77,6 +77,7 @@ export type HeroBanner = {
   subtitle: string;
   description: string;
   imageUrl: string;
+  mobileImageUrl?: string;
   productName: string;
   productUrl: string;
   badge: string;

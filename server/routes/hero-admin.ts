@@ -12,6 +12,7 @@ type HeroBannerRow = {
   subtitle: string | null;
   description: string | null;
   imageUrl: string;
+  mobileImageUrl?: string | null;
   productName: string | null;
   productUrl: string | null;
   badge: string | null;
@@ -50,11 +51,13 @@ function flagValue(value: unknown, fallback = 1) {
 
 function bannerValues(body: Record<string, unknown>, fallback?: HeroBannerRow) {
   const imageUrl = textValue(body.imageUrl, fallback?.imageUrl ?? "").trim();
+  const mobileImageUrl = textValue(body.mobileImageUrl, fallback?.mobileImageUrl ?? "").trim();
   return {
     title: textValue(body.title, fallback?.title ?? ""),
     subtitle: textValue(body.subtitle, fallback?.subtitle ?? ""),
     description: textValue(body.description, fallback?.description ?? ""),
     imageUrl,
+    mobileImageUrl,
     productName: textValue(body.productName, fallback?.productName ?? ""),
     productUrl: textValue(body.productUrl, fallback?.productUrl ?? ""),
     badge: textValue(body.badge, fallback?.badge ?? ""),
@@ -110,14 +113,15 @@ router.post("/hero", async (req, res) => {
   if (!values.imageUrl) return res.status(400).json({ error: "Banner image is required" });
 
   const stmt = db.prepare(`
-    INSERT INTO hero_banners (title, subtitle, description, imageUrl, productName, productUrl, badge, buttonText, buttonLink, showButton, darkOverlay, imageFit, imagePosition, mobileImagePosition, showText, isActive, displayOrder)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO hero_banners (title, subtitle, description, imageUrl, mobileImageUrl, productName, productUrl, badge, buttonText, buttonLink, showButton, darkOverlay, imageFit, imagePosition, mobileImagePosition, showText, isActive, displayOrder)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const info = await stmt.run(
     values.title,
     values.subtitle,
     values.description,
     values.imageUrl,
+    values.mobileImageUrl || null,
     values.productName,
     values.productUrl,
     values.badge,
@@ -147,7 +151,7 @@ router.put("/hero/:id", async (req, res) => {
 
   const stmt = db.prepare(`
     UPDATE hero_banners SET 
-      title = ?, subtitle = ?, description = ?, imageUrl = ?, productName = ?, productUrl = ?, badge = ?, 
+      title = ?, subtitle = ?, description = ?, imageUrl = ?, mobileImageUrl = ?, productName = ?, productUrl = ?, badge = ?, 
       buttonText = ?, buttonLink = ?, showButton = ?, darkOverlay = ?, imageFit = ?, imagePosition = ?, mobileImagePosition = ?, showText = ?, isActive = ?, displayOrder = ?, updated_at = datetime('now')
     WHERE id = ?
   `);
@@ -156,6 +160,7 @@ router.put("/hero/:id", async (req, res) => {
     values.subtitle,
     values.description,
     values.imageUrl,
+    values.mobileImageUrl || null,
     values.productName,
     values.productUrl,
     values.badge,

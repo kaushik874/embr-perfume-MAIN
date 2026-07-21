@@ -6,9 +6,12 @@ import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { ShopLayout } from "@/components/layout/ShopLayout";
 import { useReveal } from "@/hooks/use-reveal";
+import { Heart } from "lucide-react";
+import { useWishlist } from "@/hooks/useWishlist";
 
-function ProductCard({ product, index }: { product: Product; index: number }) {
+export function ProductCard({ product, index }: { product: Product; index: number }) {
   const { add } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const [, setLocation] = useLocation();
   const eager = index < 3;
   const saving = product.mrp - product.price;
@@ -25,6 +28,17 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
               BESTSELLER
             </span>
           ) : null}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              toggleWishlist(product.id);
+            }}
+            className="absolute right-2 top-2 z-20 rounded-full bg-white/80 p-1.5 text-gray-500 shadow-sm backdrop-blur transition-all hover:scale-110 hover:text-red-500"
+          >
+            <Heart 
+              className={`w-4 h-4 md:w-5 md:h-5 ${isWishlisted(product.id) ? "fill-red-500 text-red-500" : ""}`} 
+            />
+          </button>
           <div className="absolute inset-0 hidden bg-gold/15 blur-2xl opacity-0 transition-opacity duration-500 group-hover:opacity-100 md:block" />
           <img
             src={product.image ?? "/images/bottle-mini.svg"}

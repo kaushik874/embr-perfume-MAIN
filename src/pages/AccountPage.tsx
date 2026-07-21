@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { MapPin, PackageCheck, Star, Trash2 } from "lucide-react";
+import { MapPin, PackageCheck, Star, Trash2, Heart } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type Address, type Order } from "@/lib/api";
 import { ShopLayout } from "@/components/layout/ShopLayout";
 import { Button } from "@/components/ui/button";
+import { useWishlist } from "@/hooks/useWishlist";
+import { useQuery } from "@tanstack/react-query";
+import { ProductCard } from "./CollectionsPage";
+import { CATALOG_PRODUCTS } from "@/lib/catalog";
 
 function invoiceHref(order: Order) {
   const body = [
@@ -42,10 +46,20 @@ function formatAddress(address: Address) {
 export function AccountPage() {
   const { user, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const { isWishlisted, toggleWishlist } = useWishlist();
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+
+  const { data: productsData } = useQuery({
+    queryKey: ["products"],
+    queryFn: () => api.products(),
+    placeholderData: { products: CATALOG_PRODUCTS },
+  });
+
+  const allProducts = productsData?.products ?? CATALOG_PRODUCTS;
+  const wishlistedProducts = allProducts.filter((p: any) => isWishlisted(p.id));
 
   useEffect(() => {
     if (!loading && !user) setLocation("/");
@@ -230,10 +244,32 @@ export function AccountPage() {
 
             <section id="wishlist" className="rounded-lg border border-border-light bg-white p-5 md:p-6">
               <h2 className="font-display text-sm tracking-[0.3em] text-gold-deep">WISHLIST</h2>
-              <div className="mt-5 text-center p-8 bg-cream/30 rounded border border-border-light/50">
-                <p className="text-sm font-medium text-ink">Coming Soon</p>
-                <p className="mt-2 text-xs text-ink-muted">Save your favorite fragrances for later. Wishlist functionality will be available in the next update.</p>
-              </div>
+              
+              {wishlistedProducts.length > 0 ? (
+                <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {wishlistedProducts.map((p: any) => (
+                    <div key={p.id} className="relative group flex flex-col items-center text-center bg-cream/20 p-3 rounded-lg border border-border-light/50 hover:border-gold-deep/50 transition-colors">
+                      <button 
+                        onClick={(e) => { e.preventDefault(); toggleWishlist(p.id); }}
+                        className="absolute top-1.5 right-1.5 p-1 z-10 text-red-500 hover:scale-110 transition-transform"
+                      >
+                        <Heart className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                      <Link href={`/product/${p.slug}`} className="flex flex-col items-center w-full">
+                        <div className="w-16 h-16 rounded-full overflow-hidden mb-2 border border-gold-light/30">
+                          <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                        </div>
+                        <p className="text-xs font-medium text-ink line-clamp-1 w-full">{p.name}</p>
+                        <p className="text-[10px] text-ink-muted mt-0.5">₹{p.price}</p>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-5 text-center p-8 bg-cream/30 rounded border border-border-light/50">
+                  <p className="mt-2 text-sm text-ink-muted">Save your favorite fragrances for later.</p>
+                </div>
+              )}
             </section>
 
             <section id="settings" className="rounded-lg border border-border-light bg-white p-5 md:p-6">

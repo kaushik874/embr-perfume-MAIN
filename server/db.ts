@@ -46,6 +46,7 @@ const camelCaseColumns: Record<string, string> = {
   imagefit: "imageFit",
   imageposition: "imagePosition",
   mobileimageposition: "mobileImagePosition",
+  mobileimageurl: "mobileImageUrl",
   showtext: "showText",
   isactive: "isActive",
   displayorder: "displayOrder",
@@ -443,7 +444,8 @@ CREATE TABLE IF NOT EXISTS hero_banners (
   darkoverlay INTEGER NOT NULL DEFAULT 1,
   imagefit TEXT NOT NULL DEFAULT 'cover',
   imageposition TEXT NOT NULL DEFAULT 'center center',
-  mobileimageposition TEXT NOT NULL DEFAULT 'center center'
+  mobileimageposition TEXT NOT NULL DEFAULT 'center center',
+  mobileimageurl TEXT
 );
 
 CREATE TABLE IF NOT EXISTS about_banner (
@@ -530,10 +532,17 @@ export async function initDb(options: { seedDefaults?: boolean } = {}) {
   const { seedDefaults = true } = options;
   await db.exec(postgresSchema);
 
+  try {
+    await db.exec("ALTER TABLE hero_banners ADD COLUMN mobileimageurl TEXT");
+  } catch (e) {
+    // Ignore error if column already exists
+  }
+
   if (!seedDefaults) return;
 
   await seedProducts();
-  await ensureMilkyWay();
+  // Remove Milky Way product if it exists
+  await db.prepare("DELETE FROM products WHERE slug = 'milky-way'").run();
   await seedContentDefaults();
 }
 

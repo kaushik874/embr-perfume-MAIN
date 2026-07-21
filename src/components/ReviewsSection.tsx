@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Star, CheckCircle, Video, Image as ImageIcon } from "lucide-react";
+import { Star, CheckCircle, Video, Image as ImageIcon, Trash2, Edit2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { ReviewForm } from "./ReviewForm";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Product } from "@/lib/api";
 
 interface ReviewsSectionProps {
@@ -10,8 +11,10 @@ interface ReviewsSectionProps {
 }
 
 export function ReviewsSection({ product }: ReviewsSectionProps) {
-  const [sort, setSort] = useState("newest");
+  const { user } = useAuth();
+  const [showAllReviews, setShowAllReviews] = useState(false);
   const [isWriting, setIsWriting] = useState(false);
+  const [editingReview, setEditingReview] = useState<any>(null);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -25,13 +28,17 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
   });
 
   const { data: reviewsData, refetch: refetchReviews } = useQuery({
-    queryKey: ["/api/reviews", product.slug, sort],
+    queryKey: ["/api/reviews", product.slug],
     queryFn: async () => {
-      const res = await fetch(`/api/reviews/${product.slug}?sort=${sort}`);
-      if (!res.ok) throw new Error("Failed to fetch reviews");
+      const res = await fetch(`/api/reviews/${product.slug}`);
+      if (!res.ok) return { reviews: [] };
       return res.json();
     }
   });
+
+  const reviews = reviewsData?.reviews || [];
+  const allVideos = reviews.filter((r: any) => r.video).map((r: any) => r.video);
+  const displayedReviews = showAllReviews ? reviews : reviews.slice(0, 3);
 
   useEffect(() => {
     if (eligibility?.eligible && !isWriting && !hasAutoOpened && window.location.hash === "#reviews") {
@@ -42,7 +49,6 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
     }
   }, [eligibility, hasAutoOpened, isWriting]);
 
-  const reviews = reviewsData?.reviews || [];
   
   const avgRating = reviews.length > 0
     ? (reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length).toFixed(1)
@@ -61,8 +67,20 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
 
   const handleReviewSuccess = () => {
     setIsWriting(false);
-    refetchEligibility();
+    setEditingReview(null);
     refetchReviews();
+    refetchEligibility();
+  };
+
+  const handleDelete = async (reviewId: number) => {
+    if (!confirm("Are you sure you want to delete your review?")) return;
+    try {
+      await fetch(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+      refetchReviews();
+      refetchEligibility();
+    } catch (e) {
+      console.error("Failed to delete review", e);
+    }
   };
 
   useEffect(() => {
@@ -115,18 +133,17 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
           <p className="text-sm text-ink-muted mb-4 text-center">
             {eligibility?.eligible 
               ? eligibility?.hasReviewed 
-                ? "You have already reviewed this product."
+                ? "You have reached the maximum number of reviews for this product."
                 : "You purchased this product. Write a review!"
               : "Only customers who have purchased this product can review."
             }
           </p>
           
-          {eligibility?.eligible && (
+          {eligibility?.eligible && !eligibility?.hasReviewed && (
             <Button 
-              onClick={() => setIsWriting(true)}
-              variant={eligibility?.hasReviewed ? "outline" : "default"}
+              onClick={() => { setEditingReview(null); setIsWriting(true); }}
             >
-              {eligibility?.hasReviewed ? "Edit Your Review" : "Write a Review"}
+              Write a Review
             </Button>
           )}
         </div>
@@ -136,26 +153,41 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
         <div ref={formRef} className="mb-12 scroll-mt-24">
           <ReviewForm 
             slug={product.slug}
-            initialData={eligibility.hasReviewed ? reviews.find((r: any) => r.id === eligibility.reviewId) : null}
+            initialData={editingReview}
+            reviewId={editingReview?.id}
             orderId={eligibility.orderId}
             onSuccess={handleReviewSuccess}
-            onCancel={() => setIsWriting(false)}
+            onCancel={() => { setIsWriting(false); setEditingReview(null); }}
           />
         </div>
       )}
 
-      {reviews.length > 0 && (
-        <div className="mb-6 flex justify-end">
-          <select 
-            value={sort} 
-            onChange={e => setSort(e.target.value)}
-            className="border border-border-light rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-gold-deep"
-          >
-            <option value="newest">Newest First</option>
-            <option value="highest">Highest Rated</option>
-            <option value="lowest">Lowest Rated</option>
-            <option value="oldest">Oldest First</option>
-          </select>
+      {allVideos.length > 0 && (
+        <div className="mb-8">
+          <h4 className="font-medium text-ink mb-3">Customer Videos</h4>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {allVideos.map((vid: string, idx: number) => (
+              <div key={idx} className="relative w-32 h-32 flex-shrink-0 bg-black rounded-md overflow-hidden group cursor-pointer border border-border-light">
+                <video src={vid} controls className="w-full h-full object-cover opacity-90 group-hover:opacity-100" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {reviews.length > 3 && !showAllReviews && (
+        <div className="mb-6 flex justify-start">
+          <Button variant="outline" onClick={() => setShowAllReviews(true)}>
+            View All Reviews ({reviews.length})
+          </Button>
+        </div>
+      )}
+
+      {reviews.length > 3 && showAllReviews && (
+        <div className="mb-6 flex justify-start">
+          <Button variant="outline" onClick={() => setShowAllReviews(false)}>
+            Show Less
+          </Button>
         </div>
       )}
 
@@ -163,7 +195,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
         {reviews.length === 0 ? (
           <p className="text-center text-ink-muted py-8">No reviews yet.</p>
         ) : (
-          reviews.map((review: any) => (
+          displayedReviews.map((review: any) => (
             <div key={review.id} className="border-b border-border-light pb-8 last:border-0">
               <div className="flex items-start justify-between">
                 <div>
@@ -185,16 +217,28 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
                   </div>
                 </div>
                 
-                {review.is_pinned === 1 && (
-                  <span className="bg-gold-light text-gold-deep text-xs px-2 py-1 rounded font-medium">
-                    Pinned
-                  </span>
-                )}
-                {review.is_featured === 1 && review.is_pinned !== 1 && (
-                  <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded font-medium">
-                    Featured
-                  </span>
-                )}
+                <div className="flex gap-2">
+                  {review.is_pinned === 1 && (
+                    <span className="bg-gold-light text-gold-deep text-xs px-2 py-1 rounded font-medium h-fit">
+                      Pinned
+                    </span>
+                  )}
+                  {review.is_featured === 1 && review.is_pinned !== 1 && (
+                    <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded font-medium h-fit">
+                      Featured
+                    </span>
+                  )}
+                  {user && user.id === review.user_id && (
+                    <div className="flex gap-1 ml-2">
+                      <Button variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => { setEditingReview(review); setIsWriting(true); }}>
+                        <Edit2 className="w-3 h-3 mr-1" /> Edit
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleDelete(review.id)}>
+                        <Trash2 className="w-3 h-3 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <p className="mt-4 text-ink">{review.comment}</p>

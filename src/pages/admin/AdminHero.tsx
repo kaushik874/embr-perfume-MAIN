@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { adminApi, HeroBanner } from "@/lib/api";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { ImageCropperModal } from "@/components/admin/ImageCropper";
 import {
   ArrowDown,
   ArrowUp,
@@ -26,6 +27,7 @@ function normalizeBanner(banner: HeroBanner, index: number): HeroBanner {
     subtitle: banner.subtitle ?? "",
     description: banner.description ?? "",
     imageUrl: banner.imageUrl ?? "",
+    mobileImageUrl: banner.mobileImageUrl ?? "",
     productName: banner.productName ?? "",
     productUrl: banner.productUrl ?? "",
     badge: banner.badge ?? "",
@@ -49,6 +51,7 @@ function newBanner(displayOrder: number): HeroBanner {
     subtitle: "",
     description: "",
     imageUrl: "",
+    mobileImageUrl: "",
     productName: "",
     productUrl: "",
     badge: "",
@@ -71,6 +74,7 @@ function toPayload(banner: HeroBanner, displayOrder: number): Partial<HeroBanner
     subtitle: banner.subtitle ?? "",
     description: banner.description ?? "",
     imageUrl: (banner.imageUrl ?? "").trim(),
+    mobileImageUrl: (banner.mobileImageUrl ?? "").trim(),
     productName: banner.productName ?? "",
     productUrl: banner.productUrl ?? "",
     badge: banner.badge ?? "",
@@ -102,6 +106,7 @@ export function AdminHero() {
   const [saving, setSaving] = useState<number | null>(null);
   const [savingAll, setSavingAll] = useState(false);
   const [uploading, setUploading] = useState<number | null>(null);
+  const [croppingBannerIndex, setCroppingBannerIndex] = useState<number | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -245,8 +250,8 @@ export function AdminHero() {
     setBanners((current) => [...current, newBanner(current.length)]);
   };
 
-  const publishUploadedImage = async (banner: HeroBanner, index: number, imageUrl: string) => {
-    const updatedBanner = { ...banner, imageUrl, isActive: 1, darkOverlay: 0, showText: banner.showText ? 1 : 0 };
+  const publishUploadedImage = async (banner: HeroBanner, index: number, field: "imageUrl" | "mobileImageUrl", url: string) => {
+    const updatedBanner = { ...banner, [field]: url, isActive: 1, darkOverlay: 0, showText: banner.showText ? 1 : 0 };
     const payload = toPayload(updatedBanner, index);
 
     if (updatedBanner.id < 0) {
@@ -265,7 +270,7 @@ export function AdminHero() {
     return updatedBanner;
   };
 
-  const handleUploadImage = async (event: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handleUploadImage = async (event: React.ChangeEvent<HTMLInputElement>, index: number, field: "imageUrl" | "mobileImageUrl" = "imageUrl") => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
@@ -277,7 +282,7 @@ export function AdminHero() {
     try {
       const data = await readFileAsDataUrl(file);
       const res = await adminApi.uploadHeroBannerImage({ name: file.name, data });
-      await publishUploadedImage(banner, index, res.url);
+      await publishUploadedImage(banner, index, field, res.url);
       toast.success("Image uploaded and published in the hero slider");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to upload image");
@@ -328,6 +333,28 @@ export function AdminHero() {
       toast.error(error instanceof Error ? error.message : "Failed to upload new banner");
     } finally {
       setUploading(null);
+    }
+  };
+
+  const handleSaveCroppedImage = async (blob: Blob) => {
+    if (croppingBannerIndex === null) return;
+    const banner = banners[croppingBannerIndex];
+    if (!banner) return;
+
+    setUploading(banner.id);
+    try {
+      const file = new File([blob], `mobile-crop-${Date.now()}.webp`, { type: "image/webp" });
+      const data = await readFileAsDataUrl(file);
+      const res = await adminApi.uploadHeroBannerImage({ name: file.name, data });
+
+      // Update state AND persist to DB in one go
+      await publishUploadedImage(banner, croppingBannerIndex, "mobileImageUrl", res.url);
+      toast.success("Mobile crop saved & published!");
+    } catch (err) {
+      toast.error("Failed to upload cropped image");
+    } finally {
+      setUploading(null);
+      setCroppingBannerIndex(null);
     }
   };
 
@@ -466,11 +493,13 @@ export function AdminHero() {
                           type="file"
                           accept="image/*"
                           className="sr-only"
-                          onChange={(event) => handleUploadImage(event, index)}
+                          onChange={(event) => handleUploadImage(event, index, "imageUrl")}
                           disabled={isBusy}
                         />
                       </label>
                     </div>
+                    
+
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -545,19 +574,27 @@ export function AdminHero() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Mobile Crop Position</Label>
-                      <select
-                        value={banner.mobileImagePosition || "center center"}
-                        onChange={(event) => updateField(index, "mobileImagePosition", event.target.value)}
-                        className="min-h-9 w-full rounded-md border bg-white px-3 text-sm dark:bg-gray-950"
-                        disabled={isBusy}
-                      >
-                        <option value="center center">Center</option>
-                        <option value="left center">Left</option>
-                        <option value="right center">Right</option>
-                        <option value="center top">Top</option>
-                        <option value="center bottom">Bottom</option>
-                      </select>
+                      <Label>Mobile Version Crop</Label>
+                      <div className="flex gap-2 items-center">
+                         {banner.mobileImageUrl && (
+                           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border">
+                             <img src={banner.mobileImageUrl} alt="Crop" className="h-full w-full object-cover" />
+                           </div>
+                         )}
+                         <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           className="h-10"
+                           onClick={() => setCroppingBannerIndex(index)}
+                           disabled={isBusy || !banner.imageUrl}
+                         >
+                           {banner.mobileImageUrl ? "Recrop Mobile Image" : "Crop for Mobile"}
+                         </Button>
+                      </div>
+                      <p className="text-[10px] text-gray-500">
+                        Select a specific area of the main image to show perfectly on mobile devices.
+                      </p>
                     </div>
                   </div>
 
@@ -646,6 +683,16 @@ export function AdminHero() {
           );
         })}
       </div>
+      {croppingBannerIndex !== null && banners[croppingBannerIndex]?.imageUrl && (
+        <ImageCropperModal
+          imageUrl={banners[croppingBannerIndex].imageUrl}
+          title="Crop Mobile Image"
+          description="Drag to select the area that will be visible on mobile devices."
+          aspectRatio={3 / 4}
+          onSave={handleSaveCroppedImage}
+          onCancel={() => setCroppingBannerIndex(null)}
+        />
+      )}
     </AdminLayout>
   );
 }
