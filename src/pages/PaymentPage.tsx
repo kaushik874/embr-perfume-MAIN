@@ -134,12 +134,13 @@ export function PaymentPage() {
           contact: shipping.phone,
         },
         theme: { color: "#b08a4a" },
-        handler: async function (response: { razorpay_payment_id: string }) {
+        handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
           try {
-            await api.markPaid({
+            await api.verifyPayment({
               orderId,
               razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: result.razorpayOrderId!,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
             });
             setPaymentSuccess(true);
             clear();

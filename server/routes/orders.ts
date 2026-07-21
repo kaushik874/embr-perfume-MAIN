@@ -109,6 +109,11 @@ router.post("/guest-checkout", async (req, res) => {
     return;
   }
 
+  if (totalPaise < 100) {
+    res.status(400).json({ error: "Order amount must be at least 1 INR (100 paise)" });
+    return;
+  }
+
   const user = await ensureUserFromShipping({
     name: shipping.name,
     email: shipping.email,
