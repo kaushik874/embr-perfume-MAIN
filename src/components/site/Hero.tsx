@@ -5,13 +5,23 @@ import { Header } from "@/components/site/Header";
 import { api, HeroBanner } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+const HERO_CACHE_KEY = "embr_hero_banners";
+
+function getCachedBanners(): HeroBanner[] {
+  try {
+    const raw = sessionStorage.getItem(HERO_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
 export function Hero() {
-  const [banners, setBanners] = useState<HeroBanner[]>([]);
+  const [banners, setBanners] = useState<HeroBanner[]>(getCachedBanners);
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     api.getHeroBanners().then((res) => {
       setBanners(res.banners);
+      try { sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(res.banners)); } catch {}
     }).catch(console.error);
   }, []);
 
@@ -31,7 +41,7 @@ export function Hero() {
     return (
       <>
         <Header variant="light" />
-        <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-black">
+        <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-page">
           <div className="absolute inset-0 flex items-center justify-center text-white/50">
             Loading Hero...
           </div>
@@ -52,7 +62,7 @@ export function Hero() {
   return (
     <>
       <Header variant="light" />
-      <section className="relative aspect-[4/3] sm:aspect-auto sm:min-h-[calc(100svh-5rem)] w-full overflow-hidden bg-black group">
+      <section className="relative aspect-[4/3] sm:aspect-auto sm:min-h-[calc(100svh-5rem)] w-full overflow-hidden bg-page group">
 
       {/* Background Images Carousel */}
       <div className="absolute inset-0 z-0">

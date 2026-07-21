@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Header } from "@/components/site/Header";
-import { Footer } from "@/components/site/Footer";
 import { api } from "@/lib/api";
 
 type AboutBanner = {
@@ -17,13 +16,26 @@ type AboutBanner = {
   showButton: number;
 };
 
+const ABOUT_CACHE_KEY = "embr_about_banner";
+
+function getCachedAbout(): AboutBanner | null {
+  try {
+    const raw = sessionStorage.getItem(ABOUT_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export function AboutPage() {
-  const [banner, setBanner] = useState<AboutBanner | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [banner, setBanner] = useState<AboutBanner | null>(getCachedAbout);
+  const [loading, setLoading] = useState(getCachedAbout() === null);
 
   useEffect(() => {
     api.getAboutBanner()
-      .then((res) => setBanner(res.banner ?? null))
+      .then((res) => {
+        const b = res.banner ?? null;
+        setBanner(b);
+        try { sessionStorage.setItem(ABOUT_CACHE_KEY, JSON.stringify(b)); } catch {}
+      })
       .catch(() => setBanner(null))
       .finally(() => setLoading(false));
   }, []);
@@ -32,12 +44,11 @@ export function AboutPage() {
     return (
       <main>
         <Header variant="light" />
-        <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-black">
-          <div className="absolute inset-0 flex items-center justify-center text-white/50">
+        <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-page">
+          <div className="absolute inset-0 flex items-center justify-center text-ink-muted">
             Loading...
           </div>
         </section>
-        <Footer />
       </main>
     );
   }
@@ -53,7 +64,6 @@ export function AboutPage() {
             Embr Parfums crafts luxury fragrances inspired by memory, mood, and the quiet moments between day and night.
           </p>
         </div>
-        <Footer />
       </main>
     );
   }
@@ -125,7 +135,6 @@ export function AboutPage() {
           )}
         </div>
       </section>
-      <Footer />
     </main>
   );
 }

@@ -4,13 +4,25 @@ import { useSiteContent } from "@/hooks/use-site-content";
 import { api, FooterColumn } from "@/lib/api";
 import { SITE_LOGO, SITE_NAME } from "@/lib/site-brand";
 
+const FOOTER_CACHE_KEY = "embr_footer_columns";
+
+function getCachedFooter(): FooterColumn[] {
+  try {
+    const raw = sessionStorage.getItem(FOOTER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
 export function Footer() {
   const { getVal } = useSiteContent();
-  const [columns, setColumns] = useState<FooterColumn[]>([]);
+  const [columns, setColumns] = useState<FooterColumn[]>(getCachedFooter);
 
   useEffect(() => {
     api.getFooter()
-      .then((res) => setColumns(res.columns))
+      .then((res) => {
+        setColumns(res.columns);
+        try { sessionStorage.setItem(FOOTER_CACHE_KEY, JSON.stringify(res.columns)); } catch {}
+      })
       .catch(() => {});
   }, []);
 
