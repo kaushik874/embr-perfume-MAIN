@@ -154,7 +154,7 @@ export function AdminContent() {
   const handleToggleSection = async (key: string) => {
     const isHidden = sections[key] === true;
     if (!isHidden) {
-      if (!confirm("Are you sure you want to hide this section from the live website?")) return;
+
     }
     
     try {
@@ -167,7 +167,7 @@ export function AdminContent() {
   };
 
   const handleDelete = async (k: string) => {
-    if (!confirm(`Permanently delete key "${k}"?`)) return;
+
     try {
       await adminApi.deleteContent(k);
       setContent(prev => { delete prev[k]; return { ...prev }; });
@@ -212,7 +212,6 @@ export function AdminContent() {
   const deleteHeroBanner = async (index: number) => {
     const banner = heroBanners[index];
     if (!banner) return;
-    if (!confirm(`Delete hero banner #${index + 1}?`)) return;
 
     setBusy(`hero-banner-${banner.id}`);
     try {

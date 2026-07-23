@@ -33,7 +33,7 @@ export function AdminCoupons() {
   }, []);
 
   const handleDelete = async (id: number, code: string) => {
-    if (!confirm(`Delete coupon "${code}"?`)) return;
+
     try {
       await adminApi.deleteCoupon(id);
       toast.success("Coupon deleted");

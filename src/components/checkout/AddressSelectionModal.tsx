@@ -27,17 +27,8 @@ export function AddressSelectionModal({
 
   if (!isOpen) return null;
 
-  // Filter out identical duplicates for display
-  const uniqueAddresses: Address[] = [];
-  const seen = new Set<string>();
+  // We display all addresses without filtering duplicates so the user can see exactly what is saved
 
-  for (const addr of addresses) {
-    const key = `${addr.full_name}|${addr.mobile}|${addr.email}|${addr.house_number}|${addr.street}|${addr.area}|${addr.city}|${addr.state}|${addr.pincode}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueAddresses.push(addr);
-    }
-  }
 
   const toggleMenu = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
@@ -76,7 +67,7 @@ export function AddressSelectionModal({
 
           <div className="space-y-4">
             <h3 className="font-display text-xs tracking-[0.3em] text-gold-deep px-1">SAVED ADDRESSES</h3>
-            {uniqueAddresses.map((address) => {
+            {addresses.map((address) => {
               const isSelected = address.id === selectedAddressId;
               const isMenuOpen = openMenuId === address.id;
 

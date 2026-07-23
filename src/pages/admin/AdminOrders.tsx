@@ -93,7 +93,7 @@ export function AdminOrders() {
 
   const handleBulkDelete = async () => {
     if (selectedOrderIds.length === 0) return;
-    if (!confirm(`Are you sure you want to delete ${selectedOrderIds.length} orders?`)) return;
+
     setUpdating(true);
     try {
       const res = await adminApi.bulkDeleteOrders(selectedOrderIds);
@@ -112,7 +112,7 @@ export function AdminOrders() {
   };
 
   const handleDeleteOrder = async (id: string) => {
-    if (!confirm(`Delete order #${id}? This cannot be undone.`)) return;
+
     setUpdating(true);
     try {
       await adminApi.deleteOrder(id);

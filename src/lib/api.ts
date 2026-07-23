@@ -325,9 +325,11 @@ export const adminApi = {
 
   getOrder: (id: number) => request<{ order: Order; items: any[] }>(`/admin/orders/${id}`),
   updateOrderStatus: (id: number, status: string) => request<{ ok: boolean }>(`/admin/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  bulkUpdateOrderStatus: (ids: number[], status: string) => request<{ ok: boolean; count: number }>("/admin/orders/bulk/status", { method: "PATCH", body: JSON.stringify({ ids, status }) }),
   updateOrderTracking: (id: number, tracking_number: string) => request<{ ok: boolean }>(`/admin/orders/${id}/tracking`, { method: "PATCH", body: JSON.stringify({ tracking_number }) }),
   updateOrderShipping: (id: number, data: any) => request<{ ok: boolean }>(`/admin/orders/${id}/shipping`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteOrder: (id: number) => request<{ ok: boolean }>(`/admin/orders/${id}`, { method: "DELETE" }),
+  bulkDeleteOrders: (ids: number[]) => request<{ ok: boolean; count: number }>("/admin/orders/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
 
   getCustomers: (page = 1, limit = 20, search = "") => request<{ customers: any[]; pagination: any }>(`/admin/customers?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`),
 

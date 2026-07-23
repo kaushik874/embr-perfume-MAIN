@@ -49,7 +49,7 @@ export function FooterManager() {
   };
 
   const handleDeleteColumn = async (id: number) => {
-    if (!confirm("Delete this column and all its links?")) return;
+
     try {
       await adminApi.deleteFooterColumn(id);
       setColumns((prev) => prev.filter((c) => c.id !== id));
@@ -107,7 +107,7 @@ export function FooterManager() {
   };
 
   const handleDeleteLink = async (link: FooterLink) => {
-    if (!confirm("Delete this link?")) return;
+
     try {
       await adminApi.deleteFooterLink(link.id);
       setColumns((prev) =>

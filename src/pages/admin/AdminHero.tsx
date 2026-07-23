@@ -233,7 +233,6 @@ export function AdminHero() {
   const handleDelete = async (index: number) => {
     const banner = banners[index];
     if (!banner) return;
-    if (!confirm(`Delete Banner #${index + 1}?`)) return;
 
     try {
       if (banner.id > 0) await adminApi.deleteHeroBanner(banner.id);

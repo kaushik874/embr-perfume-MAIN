@@ -97,7 +97,7 @@ router.patch("/orders/bulk/status", async (req, res) => {
   res.json({ ok: true, count: ids.length });
 });
 
-router.delete("/orders/bulk", async (req, res) => {
+router.post("/orders/bulk-delete", async (req, res) => {
   const parsed = bulkIdsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -110,13 +110,19 @@ router.delete("/orders/bulk", async (req, res) => {
     return;
   }
 
-  const placeholders = ids.map(() => "?").join(",");
-  await db.prepare(`DELETE FROM order_items WHERE order_id IN (${placeholders})`).run(...ids);
-  await db.prepare(`DELETE FROM orders WHERE id IN (${placeholders})`).run(...ids);
+  try {
+    const placeholders = ids.map(() => "?").join(",");
+    await db.prepare(`DELETE FROM order_items WHERE order_id IN (${placeholders})`).run(...ids);
+    await db.prepare(`DELETE FROM reviews WHERE order_id IN (${placeholders})`).run(...ids);
+    await db.prepare(`DELETE FROM orders WHERE id IN (${placeholders})`).run(...ids);
 
-  logAdminAction(req.user!.userId, "bulk_delete_orders", `Deleted ${ids.length} orders`);
+    logAdminAction(req.user!.userId, "bulk_delete_orders", `Deleted ${ids.length} orders`);
 
-  res.json({ ok: true, count: ids.length });
+    res.json({ ok: true, count: ids.length });
+  } catch (err: any) {
+    console.error("Bulk delete error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete orders due to a database constraint." });
+  }
 });
 
 router.get("/orders/:id", async (req, res) => {
@@ -249,24 +255,30 @@ router.patch("/orders/:id/shipping", async (req, res) => {
 });
 
 router.delete("/orders/:id", async (req, res) => {
-  const result = await db.prepare("DELETE FROM order_items WHERE order_id = ?").run(req.params.id);
-  if (result.changes === 0) {
-    const order = await db.prepare("SELECT id FROM orders WHERE id = ?").get(req.params.id);
-    if (!order) {
+  try {
+    const result = await db.prepare("DELETE FROM order_items WHERE order_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM reviews WHERE order_id = ?").run(req.params.id);
+    
+    if (result.changes === 0) {
+      const order = await db.prepare("SELECT id FROM orders WHERE id = ?").get(req.params.id);
+      if (!order) {
+        res.status(404).json({ error: "Order not found" });
+        return;
+      }
+    }
+
+    const deleted = await db.prepare("DELETE FROM orders WHERE id = ?").run(req.params.id);
+    if (deleted.changes === 0) {
       res.status(404).json({ error: "Order not found" });
       return;
     }
+
+    logAdminAction(req.user!.userId, "delete_order", `Deleted order #${req.params.id}`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("Delete order error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete order due to a database constraint." });
   }
-
-  const deleted = await db.prepare("DELETE FROM orders WHERE id = ?").run(req.params.id);
-  if (deleted.changes === 0) {
-    res.status(404).json({ error: "Order not found" });
-    return;
-  }
-
-  logAdminAction(req.user!.userId, "delete_order", `Deleted order #${req.params.id}`);
-
-  res.json({ ok: true });
 });
 
 export default router;

@@ -40,10 +40,10 @@ router.post("/", async (req, res) => {
       VALUES (?, ?, ?, 1, ?, ?, ?, ?)
       ON CONFLICT(visitor_id) DO UPDATE SET
         last_seen = ?,
-        visit_count = CASE WHEN ? = 1 THEN visit_count + 1 ELSE visit_count END,
-        device = COALESCE(device, ?),
-        browser = COALESCE(browser, ?),
-        os = COALESCE(os, ?)
+        visit_count = CASE WHEN ? = 1 THEN analytics_visitors.visit_count + 1 ELSE analytics_visitors.visit_count END,
+        device = COALESCE(analytics_visitors.device, ?),
+        browser = COALESCE(analytics_visitors.browser, ?),
+        os = COALESCE(analytics_visitors.os, ?)
     `).run(visitorId, now, now, device, browser, os, ip, now, isNewSession ? 1 : 0, device, browser, os);
 
     // Upsert session

@@ -38,10 +38,8 @@ export function AdminReviews() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Permanently delete this review?")) {
-      await adminApi.deleteReview(id);
-      loadData();
-    }
+    await adminApi.deleteReview(id);
+    loadData();
   };
 
   const submitReply = async (id: number) => {

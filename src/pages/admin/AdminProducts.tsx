@@ -152,7 +152,7 @@ export function AdminProducts() {
   };
 
   const handleDeleteImage = async (productId: number, imageId: number) => {
-    if (!confirm("Delete this image?")) return;
+
     setDeletingImageId(imageId);
     try {
       await adminApi.deleteImage(productId, imageId);
@@ -243,7 +243,7 @@ export function AdminProducts() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this product permanently?")) return;
+
     try {
       await adminApi.deleteProduct(id);
       toast.success("Product deleted");

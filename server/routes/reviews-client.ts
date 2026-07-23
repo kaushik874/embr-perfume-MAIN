@@ -56,7 +56,7 @@ router.get("/:slug", async (req, res) => {
     LEFT JOIN users u ON r.user_id = u.id
     WHERE r.product_id = ? AND r.is_hidden = 0 AND r.status = 'approved'
     ORDER BY r.is_pinned DESC, r.is_featured DESC, ${orderClause}
-    LIMIT 100
+    LIMIT 10
   `).all(product.id) as any[];
 
   // Parse JSON strings

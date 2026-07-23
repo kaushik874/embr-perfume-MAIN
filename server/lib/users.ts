@@ -6,13 +6,13 @@ export async function ensureUserFromShipping(input: {
   name: string;
   email: string;
   phone: string;
-}): Promise<{ id: number; email: string; name: string }> {
+}): Promise<{ id: number; email: string; name: string; isNew: boolean }> {
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim();
   const phone = input.phone.trim();
 
   const existingByEmail = await db
-    .prepare("SELECT id, email, name FROM users WHERE email = ?")
+    .prepare("SELECT id, email, name FROM users WHERE lower(email) = ?")
     .get(email) as { id: number; email: string; name: string } | undefined;
 
   if (existingByEmail) {
@@ -21,20 +21,7 @@ export async function ensureUserFromShipping(input: {
       phone,
       existingByEmail.id,
     );
-    return { id: existingByEmail.id, email: existingByEmail.email, name };
-  }
-
-  const existingByPhone = await db
-    .prepare("SELECT id, email, name FROM users WHERE phone = ? ORDER BY id DESC LIMIT 1")
-    .get(phone) as { id: number; email: string; name: string } | undefined;
-
-  if (existingByPhone) {
-    await db.prepare("UPDATE users SET name = ?, email = ? WHERE id = ?").run(
-      name,
-      email,
-      existingByPhone.id,
-    );
-    return { id: existingByPhone.id, email, name };
+    return { id: existingByEmail.id, email: existingByEmail.email, name, isNew: false };
   }
 
   const password_hash = bcrypt.hashSync(
@@ -51,5 +38,6 @@ export async function ensureUserFromShipping(input: {
     id: Number(result.lastInsertRowid),
     email,
     name,
+    isNew: true,
   };
 }

@@ -142,7 +142,10 @@ router.post("/guest-checkout", async (req, res) => {
     ...shipping,
     addressId,
   });
-  setAuthCookie(res, user.id, user.email);
+
+  if (user.isNew) {
+    setAuthCookie(res, user.id, user.email);
+  }
 
   if (!razorpayEnabled()) {
     await db.prepare(

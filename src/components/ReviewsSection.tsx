@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Star, CheckCircle, Video, Image as ImageIcon, Trash2, Edit2 } from "lucide-react";
+import { Star, CheckCircle, Video, Image as ImageIcon, Trash2, Edit2, X, Play } from "lucide-react";
 import { Button } from "./ui/button";
 import { ReviewForm } from "./ReviewForm";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,10 +12,12 @@ interface ReviewsSectionProps {
 
 export function ReviewsSection({ product }: ReviewsSectionProps) {
   const { user } = useAuth();
-  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [sort, setSort] = useState("newest");
   const [isWriting, setIsWriting] = useState(false);
   const [editingReview, setEditingReview] = useState<any>(null);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'video' | 'image'} | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   const { data: eligibility, refetch: refetchEligibility } = useQuery({
@@ -28,17 +30,13 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
   });
 
   const { data: reviewsData, refetch: refetchReviews } = useQuery({
-    queryKey: ["/api/reviews", product.slug],
+    queryKey: ["/api/reviews", product.slug, sort],
     queryFn: async () => {
-      const res = await fetch(`/api/reviews/${product.slug}`);
-      if (!res.ok) return { reviews: [] };
+      const res = await fetch(`/api/reviews/${product.slug}?sort=${sort}`);
+      if (!res.ok) throw new Error("Failed to fetch reviews");
       return res.json();
     }
   });
-
-  const reviews = reviewsData?.reviews || [];
-  const allVideos = reviews.filter((r: any) => r.video).map((r: any) => r.video);
-  const displayedReviews = showAllReviews ? reviews : reviews.slice(0, 3);
 
   useEffect(() => {
     if (eligibility?.eligible && !isWriting && !hasAutoOpened && window.location.hash === "#reviews") {
@@ -49,6 +47,13 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
     }
   }, [eligibility, hasAutoOpened, isWriting]);
 
+  const reviews = reviewsData?.reviews || [];
+  const displayedReviews = showAll ? reviews : reviews.slice(0, 3);
+  
+  const allVideos = reviews.filter((r: any) => r.video).map((r: any) => ({
+    url: r.video,
+    reviewId: r.id
+  }));
   
   const avgRating = reviews.length > 0
     ? (reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length).toFixed(1)
@@ -73,7 +78,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
   };
 
   const handleDelete = async (reviewId: number) => {
-    if (!confirm("Are you sure you want to delete your review?")) return;
+
     try {
       await fetch(`/api/reviews/${reviewId}`, { method: 'DELETE' });
       refetchReviews();
@@ -162,37 +167,49 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
         </div>
       )}
 
-      {allVideos.length > 0 && (
-        <div className="mb-8">
-          <h4 className="font-medium text-ink mb-3">Customer Videos</h4>
+      {reviews.length > 0 && (
+        <div className="mb-6 flex justify-end">
+          {!showAll ? (
+            <Button variant="outline" onClick={() => setShowAll(true)}>
+              All Reviews
+            </Button>
+          ) : (
+            <select 
+              value={sort} 
+              onChange={e => setSort(e.target.value)}
+              className="border border-border-light rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-gold-deep"
+            >
+              <option value="newest">Newest First</option>
+              <option value="highest">Highest Rated</option>
+              <option value="lowest">Lowest Rated</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+          )}
+        </div>
+      )}
+
+      {showAll && allVideos.length > 0 && (
+        <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-border-light">
+          <h3 className="text-sm font-semibold text-ink mb-3 uppercase tracking-wider">Customer Videos</h3>
           <div className="flex gap-4 overflow-x-auto pb-2">
-            {allVideos.map((vid: string, idx: number) => (
-              <div key={idx} className="relative w-32 h-32 flex-shrink-0 bg-black rounded-md overflow-hidden group cursor-pointer border border-border-light">
-                <video src={vid} controls className="w-full h-full object-cover opacity-90 group-hover:opacity-100" />
+            {allVideos.map((v: any, i: number) => (
+              <div 
+                key={i} 
+                onClick={() => setSelectedMedia({ url: v.url, type: 'video' })}
+                className="relative w-32 h-32 flex-shrink-0 bg-black rounded-md overflow-hidden group cursor-pointer border border-border-light"
+              >
+                <video src={v.url} className="w-full h-full object-cover opacity-80" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Play className="w-8 h-8 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {reviews.length > 3 && !showAllReviews && (
-        <div className="mb-6 flex justify-start">
-          <Button variant="outline" onClick={() => setShowAllReviews(true)}>
-            View All Reviews ({reviews.length})
-          </Button>
-        </div>
-      )}
-
-      {reviews.length > 3 && showAllReviews && (
-        <div className="mb-6 flex justify-start">
-          <Button variant="outline" onClick={() => setShowAllReviews(false)}>
-            Show Less
-          </Button>
-        </div>
-      )}
-
       <div className="space-y-8">
-        {reviews.length === 0 ? (
+        {displayedReviews.length === 0 ? (
           <p className="text-center text-ink-muted py-8">No reviews yet.</p>
         ) : (
           displayedReviews.map((review: any) => (
@@ -246,16 +263,23 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
               {((review.images && review.images.length > 0) || review.video) && (
                 <div className="flex gap-4 mt-4 overflow-x-auto pb-2">
                   {review.video && (
-                    <div className="relative w-24 h-24 flex-shrink-0 bg-black rounded-md overflow-hidden group cursor-pointer">
+                    <div 
+                      onClick={() => setSelectedMedia({ url: review.video, type: 'video' })}
+                      className="relative w-24 h-24 flex-shrink-0 bg-black rounded-md overflow-hidden group cursor-pointer"
+                    >
                       <video src={review.video} className="w-full h-full object-cover opacity-80" />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <Video className="w-6 h-6 text-white" />
+                        <Play className="w-6 h-6 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
                       </div>
                     </div>
                   )}
                   {review.images && review.images.map((img: string, i: number) => (
-                    <div key={i} className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden border border-border-light">
-                      <img src={img} alt="Review attachment" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                    <div 
+                      key={i} 
+                      onClick={() => setSelectedMedia({ url: img, type: 'image' })}
+                      className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden border border-border-light cursor-pointer group"
+                    >
+                      <img src={img} alt="Review attachment" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                     </div>
                   ))}
                 </div>
@@ -274,6 +298,34 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
           ))
         )}
       </div>
+
+      {selectedMedia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+          <button 
+            onClick={() => setSelectedMedia(null)}
+            className="absolute top-4 right-4 p-2 text-white hover:text-gold-light transition-colors"
+          >
+            <X className="w-8 h-8" />
+          </button>
+          
+          <div className="relative max-w-5xl max-h-full w-full h-full flex items-center justify-center">
+            {selectedMedia.type === 'video' ? (
+              <video 
+                src={selectedMedia.url} 
+                controls 
+                autoPlay 
+                className="max-w-full max-h-[90vh] object-contain rounded"
+              />
+            ) : (
+              <img 
+                src={selectedMedia.url} 
+                alt="Fullscreen review media" 
+                className="max-w-full max-h-[90vh] object-contain rounded"
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
