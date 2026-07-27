@@ -103,6 +103,7 @@ router.post("/login", async (req, res) => {
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
   setAuthCookie(res, token);
   logSuccessfulLogin(user.email, ip);
+  await db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
 
   res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
@@ -193,6 +194,7 @@ router.post("/otp/verify", async (req, res) => {
   await db.prepare("UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?").run(otpRow.id);
   setSessionCookie(res, otpRow.user_id, otpRow.email, otpRow.role);
   logSuccessfulLogin(otpRow.email, req.ip || req.socket.remoteAddress || "unknown");
+  await db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(otpRow.user_id);
 
   res.json({
     user: {
@@ -265,6 +267,7 @@ router.post("/google", async (req, res) => {
 
     setSessionCookie(res, user.id, user.email, user.role);
     logSuccessfulLogin(user.email, ip);
+    await db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
 
     res.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {

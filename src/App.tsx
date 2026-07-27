@@ -17,19 +17,18 @@ import { ShippingPage } from "@/pages/ShippingPage";
 import { FaqPage } from "@/pages/FaqPage";
 import { CollectionsPage } from "@/pages/CollectionsPage";
 import NotFound from "@/pages/not-found";
-import React, { Suspense } from "react";
-const AdminDashboard = React.lazy(() => import("@/pages/admin/AdminDashboard").then(m => ({ default: m.AdminDashboard })));
-const AdminOrders = React.lazy(() => import("@/pages/admin/AdminOrders").then(m => ({ default: m.AdminOrders })));
-const AdminProducts = React.lazy(() => import("@/pages/admin/AdminProducts").then(m => ({ default: m.AdminProducts })));
-const AdminUsers = React.lazy(() => import("@/pages/admin/AdminUsers").then(m => ({ default: m.AdminUsers })));
-const AdminCoupons = React.lazy(() => import("@/pages/admin/AdminCoupons").then(m => ({ default: m.AdminCoupons })));
-const AdminReviews = React.lazy(() => import("@/pages/admin/AdminReviews").then(m => ({ default: m.AdminReviews })));
-const AdminMarketing = React.lazy(() => import("@/pages/admin/AdminMarketing").then(m => ({ default: m.AdminMarketing })));
-const AdminContent = React.lazy(() => import("@/pages/admin/AdminContent").then(m => ({ default: m.AdminContent })));
-const AdminSecurity = React.lazy(() => import("@/pages/admin/AdminSecurity").then(m => ({ default: m.AdminSecurity })));
-const AdminHero = React.lazy(() => import("@/pages/admin/AdminHero").then(m => ({ default: m.AdminHero })));
-const AdminAbout = React.lazy(() => import("@/pages/admin/AdminAbout").then(m => ({ default: m.AdminAbout })));
-const AdminAnalytics = React.lazy(() => import("@/pages/admin/AdminAnalytics").then(m => ({ default: m.AdminAnalytics })));
+import { AdminDashboard } from "@/pages/admin/AdminDashboard";
+import { AdminOrders } from "@/pages/admin/AdminOrders";
+import { AdminProducts } from "@/pages/admin/AdminProducts";
+import { AdminUsers } from "@/pages/admin/AdminUsers";
+import { AdminCoupons } from "@/pages/admin/AdminCoupons";
+import { AdminReviews } from "@/pages/admin/AdminReviews";
+import { AdminMarketing } from "@/pages/admin/AdminMarketing";
+import { AdminContent } from "@/pages/admin/AdminContent";
+import { AdminSecurity } from "@/pages/admin/AdminSecurity";
+import { AdminHero } from "@/pages/admin/AdminHero";
+import { AdminAbout } from "@/pages/admin/AdminAbout";
+import { AdminAnalytics } from "@/pages/admin/AdminAnalytics";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
 
@@ -44,28 +43,18 @@ function ScrollRestoration() {
   return null;
 }
 
-function withSuspense(Component: React.ComponentType) {
-  return function SuspenseWrapper(props: any) {
-    return (
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-brand-gold">Loading...</div>}>
-        <Component {...props} />
-      </Suspense>
-    );
-  };
-}
-
-const AdminAnalyticsRoute = withSuspense(AdminAnalytics);
-const AdminOrdersRoute = withSuspense(AdminOrders);
-const AdminProductsRoute = withSuspense(AdminProducts);
-const AdminUsersRoute = withSuspense(AdminUsers);
-const AdminCouponsRoute = withSuspense(AdminCoupons);
-const AdminReviewsRoute = withSuspense(AdminReviews);
-const AdminMarketingRoute = withSuspense(AdminMarketing);
-const AdminContentRoute = withSuspense(AdminContent);
-const AdminHeroRoute = withSuspense(AdminHero);
-const AdminAboutRoute = withSuspense(AdminAbout);
-const AdminSecurityRoute = withSuspense(AdminSecurity);
-const AdminDashboardRoute = withSuspense(AdminDashboard);
+const AdminAnalyticsRoute = AdminAnalytics;
+const AdminOrdersRoute = AdminOrders;
+const AdminProductsRoute = AdminProducts;
+const AdminUsersRoute = AdminUsers;
+const AdminCouponsRoute = AdminCoupons;
+const AdminReviewsRoute = AdminReviews;
+const AdminMarketingRoute = AdminMarketing;
+const AdminContentRoute = AdminContent;
+const AdminHeroRoute = AdminHero;
+const AdminAboutRoute = AdminAbout;
+const AdminSecurityRoute = AdminSecurity;
+const AdminDashboardRoute = AdminDashboard;
 
 function App() {
   return (

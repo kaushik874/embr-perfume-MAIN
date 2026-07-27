@@ -23,12 +23,12 @@ router.get("/customers", async (req, res) => {
   ).get(...params) as { total: number };
 
   const customers = await db.prepare(`
-    SELECT u.id, u.name, u.email, u.phone, u.created_at,
+    SELECT u.id, u.name, u.email, u.phone, u.created_at, u.last_login,
       (SELECT COUNT(*) FROM orders WHERE user_id = u.id) as order_count,
       (SELECT COALESCE(SUM(total_paise), 0) FROM orders WHERE user_id = u.id AND status IN ('paid','shipped','delivered')) as total_spent
     FROM users u
     ${where}
-    ORDER BY u.created_at DESC
+    ORDER BY COALESCE(u.last_login, u.created_at) DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 

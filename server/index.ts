@@ -133,7 +133,7 @@ app.use("/api/reviews", reviewsClientRoutes);
 app.use("/api", heroRoutes);
 app.use("/api", aboutAdminRoutes); // public about-banner endpoint
 app.use("/api", footerAdminRoutes); // public footer endpoint
-app.use("/api/track", analyticsTrackRoutes); // public analytics tracking
+app.use("/api/v-metrics", analyticsTrackRoutes); // public analytics tracking
 
 app.use("/api/admin", requireAuth, requireAdmin, heroAdminRoutes);
 app.use("/api/admin", requireAuth, requireAdmin, aboutAdminRoutes);

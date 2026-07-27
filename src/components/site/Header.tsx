@@ -75,6 +75,19 @@ export function Header({ variant = "dark", className }: HeaderProps) {
           >
             Bag ({count})
           </Link>
+          {!user && (
+            <Link
+              href="/login"
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs transition-colors sm:px-4 sm:py-1.5 sm:text-sm",
+                isLight
+                  ? "border-ink/20 hover:border-gold hover:text-gold"
+                  : "border-cream/25 hover:border-gold hover:text-gold",
+              )}
+            >
+              Login/Signup
+            </Link>
+          )}
         </div>
       )}
     </header>

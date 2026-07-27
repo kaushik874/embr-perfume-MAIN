@@ -534,9 +534,11 @@ export async function initDb(options: { seedDefaults?: boolean } = {}) {
 
   try {
     await db.exec("ALTER TABLE hero_banners ADD COLUMN mobileimageurl TEXT");
-  } catch (e) {
-    // Ignore error if column already exists
-  }
+  } catch (e) {}
+  
+  try {
+    await db.exec("ALTER TABLE users ADD COLUMN last_login TIMESTAMPTZ");
+  } catch (e) {}
 
   if (!seedDefaults) return;
 
@@ -756,6 +758,7 @@ export type UserRow = {
   password_hash: string;
   role: string;
   created_at: string;
+  last_login?: string | null;
 };
 
 export type ProductRow = {

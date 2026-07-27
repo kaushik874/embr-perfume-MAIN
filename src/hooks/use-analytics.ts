@@ -47,7 +47,7 @@ async function trackPageView(page: string, isNewSession: boolean) {
     const sessionId = getSessionId();
     const referrer = document.referrer || "";
 
-    await fetch("/api/track", {
+    await fetch("/api/v-metrics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -61,7 +61,7 @@ async function trackPageView(page: string, isNewSession: boolean) {
 async function sendHeartbeat() {
   try {
     const sessionId = getSessionId();
-    await fetch("/api/track/heartbeat", {
+    await fetch("/api/v-metrics/pulse", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",

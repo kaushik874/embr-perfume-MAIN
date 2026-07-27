@@ -80,8 +80,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ── PATCH /api/track/heartbeat — keep session alive ──────────────────────
-router.patch("/heartbeat", async (req, res) => {
+// ── PATCH /api/v-metrics/pulse — keep session alive ──────────────────────
+router.patch("/pulse", async (req, res) => {
   try {
     const ua = req.headers["user-agent"] || "";
     if (isBot(ua)) { res.json({ ok: true }); return; }

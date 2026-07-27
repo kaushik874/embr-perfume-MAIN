@@ -76,7 +76,7 @@ export function AdminUsers() {
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Orders</th>
                 <th className="px-4 py-3 font-medium">Total Spent</th>
-                <th className="px-4 py-3 font-medium">Joined</th>
+                <th className="px-4 py-3 font-medium">Last Active</th>
                 <th className="px-4 py-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
@@ -92,7 +92,7 @@ export function AdminUsers() {
                   <td className="px-4 py-3 text-xs text-gray-500">{c.phone || "—"}</td>
                   <td className="px-4 py-3 font-medium">{c.order_count}</td>
                   <td className="px-4 py-3 font-medium">₹{(c.total_spent / 100).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.last_login || c.created_at).toLocaleDateString()} {new Date(c.last_login || c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => viewCustomer(c.id)}
                       className="text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white font-medium text-xs">
