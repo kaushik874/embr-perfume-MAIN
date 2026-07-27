@@ -82,7 +82,8 @@ app.use(
         frameSrc: ["'self'", "https://api.razorpay.com", "https://checkout.razorpay.com", "https://accounts.google.com"],
       },
     },
-    crossOriginResourcePolicy: { policy: "same-site" },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   }),
 );
 

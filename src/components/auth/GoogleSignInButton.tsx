@@ -49,6 +49,7 @@ export function GoogleSignInButton({
 }: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [clientId, setClientId] = useState<string | null>(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -56,7 +57,8 @@ export function GoogleSignInButton({
     api
       .publicConfig()
       .then((cfg) => setClientId(cfg.googleClientId || null))
-      .catch(() => setClientId(null));
+      .catch(() => setClientId(null))
+      .finally(() => setConfigLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -92,6 +94,14 @@ export function GoogleSignInButton({
       cancelled = true;
     };
   }, [clientId, onCredential, text]);
+
+  if (!configLoaded) {
+    return (
+      <div className="flex min-h-[44px] items-center justify-center">
+        <p className="text-xs text-ink-muted">Loading Google sign-in...</p>
+      </div>
+    );
+  }
 
   if (!clientId) {
     return (
