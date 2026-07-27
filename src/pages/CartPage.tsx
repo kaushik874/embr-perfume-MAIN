@@ -17,12 +17,10 @@ export function CartPage() {
     return (
       <ShopLayout promo="Your bag is waiting — explore the collection">
         <div className="mx-auto max-w-2xl px-6 py-24 text-center">
-          <p className="font-display text-xs tracking-[0.4em] text-gold-deep">— YOUR BAG</p>
-          <h1 className="mt-3 font-serif text-4xl text-ink">Empty for now</h1>
-          <p className="mt-4 text-ink-muted">Discover Milky Way and the full Embr edit.</p>
-          <Link href="/product/milky-way">
+          <h1 className="font-serif text-4xl text-ink">Empty for now</h1>
+          <Link href="/collections">
             <Button className="mt-8 rounded-full border-2 border-ink bg-transparent px-10 tracking-widest text-ink hover:bg-ink hover:text-white">
-              SHOP MILKY WAY
+              SHOP NOW
             </Button>
           </Link>
         </div>

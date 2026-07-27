@@ -116,10 +116,6 @@ export function CollectionsPage() {
             <h1 className="font-serif text-4xl text-ink sm:text-5xl md:text-6xl lg:text-7xl">
               All Collections
             </h1>
-            <p className="mt-4 text-ink-muted max-w-xl mx-auto">
-              Explore our full range of handcrafted extrait de parfums.
-              Discover signature scents that define your identity.
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
