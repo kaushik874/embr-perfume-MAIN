@@ -15,7 +15,10 @@ type AuthContextValue = {
   requestOtp: (identifier: string) => Promise<{ demoOtp?: string; message: string }>;
   verifyOtp: (identifier: string, otp: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
+  sendSignupOtp: (email: string) => Promise<{ demoOtp?: string; message: string }>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ demoOtp?: string; message: string }>;
+  resetPassword: (email: string, otp: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -61,9 +64,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   };
 
+  const sendSignupOtp = async (email: string) => {
+    const result = await api.sendSignupOtp({ email });
+    return { demoOtp: result.demoOtp, message: result.message };
+  };
+
   const register = async (name: string, email: string, password: string) => {
     const { user: u } = await api.register({ name, email, password });
     setUser(u);
+  };
+
+  const forgotPassword = async (email: string) => {
+    const result = await api.forgotPassword({ email });
+    return { demoOtp: result.demoOtp, message: result.message };
+  };
+
+  const resetPassword = async (email: string, otp: string, password: string) => {
+    await api.resetPassword({ email, otp, password });
   };
 
   const logout = async () => {
@@ -73,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, requestOtp, verifyOtp, loginWithGoogle, register, logout, refresh }}
+      value={{ user, loading, login, requestOtp, verifyOtp, loginWithGoogle, sendSignupOtp, register, forgotPassword, resetPassword, logout, refresh }}
     >
       {children}
     </AuthContext.Provider>

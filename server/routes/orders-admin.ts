@@ -2,6 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { logAdminAction } from "../middleware/security.js";
+import { sendEmail } from "../lib/email.js";
+import { orderStatusEmail } from "../lib/email-templates.js";
 
 const router = Router();
 
@@ -92,6 +94,21 @@ router.patch("/orders/bulk/status", async (req, res) => {
     await db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).run(...params);
   }
 
+  // Send status emails
+  const updatedOrders = await db.prepare(`
+    SELECT o.*, u.email as account_email
+    FROM orders o
+    LEFT JOIN users u ON o.user_id = u.id
+    WHERE o.id IN (${placeholders})
+  `).all(...ids) as any[];
+
+  for (const order of updatedOrders) {
+    const userEmail = order.shipping_email || order.account_email;
+    if (userEmail) {
+      sendEmail(userEmail, order.shipping_name, `Order #${order.id} Update: ${status.toUpperCase()}`, orderStatusEmail(order, status)).catch(console.error);
+    }
+  }
+
   logAdminAction(req.user!.userId, "bulk_update_order_status", `Updated status to ${status} for ${ids.length} orders`);
 
   res.json({ ok: true, count: ids.length });
@@ -172,6 +189,20 @@ router.patch("/orders/:id/status", async (req, res) => {
   if (result.changes === 0) {
     res.status(404).json({ error: "Order not found" });
     return;
+  }
+
+  const updatedOrder = await db.prepare(`
+    SELECT o.*, u.email as account_email
+    FROM orders o
+    LEFT JOIN users u ON o.user_id = u.id
+    WHERE o.id = ?
+  `).get(req.params.id) as any;
+
+  if (updatedOrder) {
+    const userEmail = updatedOrder.shipping_email || updatedOrder.account_email;
+    if (userEmail) {
+      sendEmail(userEmail, updatedOrder.shipping_name, `Order #${updatedOrder.id} Update: ${parsed.data.status.toUpperCase()}`, orderStatusEmail(updatedOrder, parsed.data.status)).catch(console.error);
+    }
   }
 
   logAdminAction(

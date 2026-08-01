@@ -8,6 +8,8 @@ import { setAuthCookie } from "../lib/auth-cookie.js";
 import { buildOrderLines, createOrderRecord } from "../lib/orders.js";
 import { ensureUserFromShipping } from "../lib/users.js";
 import { saveCustomerAddress } from "../lib/addresses.js";
+import { sendEmail } from "../lib/email.js";
+import { orderConfirmationEmail } from "../lib/email-templates.js";
 
 const router = Router();
 
@@ -152,6 +154,11 @@ router.post("/guest-checkout", async (req, res) => {
       `UPDATE orders SET status = 'paid', razorpay_payment_id = 'demo' WHERE id = ?`,
     ).run(orderId);
 
+    const order = await db.prepare("SELECT * FROM orders WHERE id = ?").get(orderId);
+    if (order) {
+      sendEmail(user.email, user.name, `Order #${orderId} Confirmed`, orderConfirmationEmail(order, lineItems)).catch(console.error);
+    }
+
     res.json({
       mode: "demo",
       orderId,
@@ -239,6 +246,20 @@ router.post("/mark-paid", requireAuth, async (req, res) => {
     `UPDATE orders SET status = 'paid', razorpay_payment_id = ? WHERE id = ?`,
   ).run(razorpay_payment_id, orderId);
 
+  const updatedOrder = await db.prepare("SELECT * FROM orders WHERE id = ?").get(orderId) as any;
+  if (updatedOrder) {
+    const items = await db.prepare(`
+      SELECT oi.*, p.name 
+      FROM order_items oi 
+      JOIN products p ON oi.product_id = p.id 
+      WHERE oi.order_id = ?
+    `).all(orderId);
+    const userEmail = updatedOrder.shipping_email || (await db.prepare("SELECT email FROM users WHERE id = ?").get(updatedOrder.user_id) as any)?.email;
+    if (userEmail) {
+      sendEmail(userEmail, updatedOrder.shipping_name, `Order #${orderId} Confirmed`, orderConfirmationEmail(updatedOrder, items)).catch(console.error);
+    }
+  }
+
   res.json({ ok: true, orderId });
 });
 
@@ -287,6 +308,20 @@ router.post("/verify", requireAuth, async (req, res) => {
   await db.prepare(
     `UPDATE orders SET status = 'paid', razorpay_payment_id = ?, razorpay_order_id = ? WHERE id = ?`,
   ).run(razorpay_payment_id, razorpay_order_id, orderId);
+
+  const updatedOrder = await db.prepare("SELECT * FROM orders WHERE id = ?").get(orderId) as any;
+  if (updatedOrder) {
+    const items = await db.prepare(`
+      SELECT oi.*, p.name 
+      FROM order_items oi 
+      JOIN products p ON oi.product_id = p.id 
+      WHERE oi.order_id = ?
+    `).all(orderId);
+    const userEmail = updatedOrder.shipping_email || (await db.prepare("SELECT email FROM users WHERE id = ?").get(updatedOrder.user_id) as any)?.email;
+    if (userEmail) {
+      sendEmail(userEmail, updatedOrder.shipping_name, `Order #${orderId} Confirmed`, orderConfirmationEmail(updatedOrder, items)).catch(console.error);
+    }
+  }
 
   res.json({ ok: true, orderId });
 });

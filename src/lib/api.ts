@@ -188,8 +188,26 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  sendSignupOtp: (body: { email: string }) =>
+    request<{ ok: boolean; message: string; demoOtp?: string }>("/auth/otp/send-signup", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   register: (body: { name: string; email: string; password: string }) =>
     request<{ user: User }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  forgotPassword: (body: { email: string }) =>
+    request<{ ok: boolean; message: string; demoOtp?: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  resetPassword: (body: { email: string; otp: string; password: string }) =>
+    request<{ ok: boolean }>("/auth/reset-password", {
       method: "POST",
       body: JSON.stringify(body),
     }),
