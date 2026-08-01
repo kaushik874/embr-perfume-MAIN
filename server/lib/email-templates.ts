@@ -198,14 +198,14 @@ export function orderStatusEmail(order: any, status: string) {
     'cancelled': 'Your order has been cancelled as requested.',
   };
   
-  const message = statusMessages[status] || \`Your order status has been updated to: \${status}.\`;
+  const message = statusMessages[status] || `Your order status has been updated to: ${status}.`;
 
   const content = `
     <h2 style="font-family: 'Playfair Display', serif; font-weight: normal; margin-top: 0; text-transform: capitalize;">Order ${status}</h2>
     <p>${message}</p>
     <p><strong>Order Number:</strong> #${order.id}</p>
     
-    ${order.tracking_number ? \`<p><strong>Tracking Number:</strong> \${order.tracking_number}</p>\` : ''}
+    ${order.tracking_number ? `<p><strong>Tracking Number:</strong> ${order.tracking_number}</p>` : ''}
     
     <div style="text-align: center; margin-top: 40px;">
       <a href="${process.env.CLIENT_URL || 'https://embrperfume.com'}/account" class="btn">View Order History</a>
