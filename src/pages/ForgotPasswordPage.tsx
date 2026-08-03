@@ -15,7 +15,6 @@ export function ForgotPasswordPage() {
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
-  const [displayOtp, setDisplayOtp] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   return (
@@ -37,11 +36,7 @@ export function ForgotPasswordPage() {
                 const result = await forgotPassword(email);
                 setMode("otp");
                 setOtpMessage(result.message);
-                setDisplayOtp(result.demoOtp ?? null);
-                if (result.demoOtp) {
-                  setOtp(result.demoOtp);
-                }
-                toast.success(result.demoOtp ? "Verification code ready" : result.message);
+                toast.success(result.message);
               } else {
                 await resetPassword(email, otp, password);
                 toast.success("Password reset successful. Please login.");
@@ -64,12 +59,8 @@ export function ForgotPasswordPage() {
           {mode === "otp" && (
             <>
               <div className="rounded-lg border border-gold-deep/30 bg-gold-deep/10 p-4 text-sm text-ink">
-                <p className="font-medium text-gold-deep">Reset code</p>
-                {displayOtp ? (
-                  <p className="mt-2 font-display text-2xl tracking-[0.3em]">{displayOtp}</p>
-                ) : (
-                  <p className="mt-2 text-ink-muted">Check your email ({email}) for the 6-digit code.</p>
-                )}
+                <p className="font-medium text-gold-deep">Email verification</p>
+                <p className="mt-2 text-ink-muted">Check your email ({email}) for the 6-digit code.</p>
                 {otpMessage && <p className="mt-2 text-xs text-ink-muted">{otpMessage}</p>}
               </div>
               <div className="space-y-2">
@@ -88,7 +79,7 @@ export function ForgotPasswordPage() {
             disabled={busy}
             className="w-full rounded-full bg-ink text-white hover:bg-ink/90"
           >
-            {busy ? "Please wait..." : mode === "email" ? "Send reset link" : "Reset password"}
+            {busy ? "Please wait..." : mode === "email" ? "Send verification email" : "Reset password"}
           </Button>
         </form>
 

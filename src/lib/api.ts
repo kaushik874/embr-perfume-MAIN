@@ -171,7 +171,7 @@ export const api = {
     }),
 
   requestOtp: (body: { identifier: string }) =>
-    request<{ ok: boolean; channel: "email" | "mobile"; message: string; demoOtp?: string }>("/auth/otp/request", {
+    request<{ ok: boolean; channel: "email" | "mobile"; message: string }>("/auth/otp/request", {
       method: "POST",
       body: JSON.stringify(body),
     }),
@@ -189,19 +189,19 @@ export const api = {
     }),
 
   sendSignupOtp: (body: { email: string }) =>
-    request<{ ok: boolean; message: string; demoOtp?: string }>("/auth/otp/send-signup", {
+    request<{ ok: boolean; message: string }>("/auth/otp/send-signup", {
       method: "POST",
       body: JSON.stringify(body),
     }),
 
-  register: (body: { name: string; email: string; password: string }) =>
+  register: (body: { name: string; email: string; password: string; otp: string }) =>
     request<{ user: User }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(body),
     }),
 
   forgotPassword: (body: { email: string }) =>
-    request<{ ok: boolean; message: string; demoOtp?: string }>("/auth/forgot-password", {
+    request<{ ok: boolean; message: string }>("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify(body),
     }),

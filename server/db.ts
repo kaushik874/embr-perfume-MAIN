@@ -413,6 +413,7 @@ CREATE TABLE IF NOT EXISTS otp_codes (
   channel TEXT NOT NULL,
   otp_hash TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
   consumed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -550,6 +551,10 @@ export async function initDb(options: { seedDefaults?: boolean } = {}) {
   
   try {
     await db.exec("ALTER TABLE users ADD COLUMN last_login TIMESTAMPTZ");
+  } catch (e) {}
+
+  try {
+    await db.exec("ALTER TABLE otp_codes ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
   } catch (e) {}
 
   if (!seedDefaults) return;

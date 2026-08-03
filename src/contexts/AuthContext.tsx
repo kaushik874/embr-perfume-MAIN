@@ -12,12 +12,12 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  requestOtp: (identifier: string) => Promise<{ demoOtp?: string; message: string }>;
+  requestOtp: (identifier: string) => Promise<{ message: string }>;
   verifyOtp: (identifier: string, otp: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
-  sendSignupOtp: (email: string) => Promise<{ demoOtp?: string; message: string }>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<{ demoOtp?: string; message: string }>;
+  sendSignupOtp: (email: string) => Promise<{ message: string }>;
+  register: (name: string, email: string, password: string, otp: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ message: string }>;
   resetPassword: (email: string, otp: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const requestOtp = async (identifier: string) => {
     const result = await api.requestOtp({ identifier });
-    return { demoOtp: result.demoOtp, message: result.message };
+    return { message: result.message };
   };
 
   const verifyOtp = async (identifier: string, otp: string) => {
@@ -66,17 +66,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendSignupOtp = async (email: string) => {
     const result = await api.sendSignupOtp({ email });
-    return { demoOtp: result.demoOtp, message: result.message };
+    return { message: result.message };
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const { user: u } = await api.register({ name, email, password });
+  const register = async (name: string, email: string, password: string, otp: string) => {
+    const { user: u } = await api.register({ name, email, password, otp });
     setUser(u);
   };
 
   const forgotPassword = async (email: string) => {
     const result = await api.forgotPassword({ email });
-    return { demoOtp: result.demoOtp, message: result.message };
+    return { message: result.message };
   };
 
   const resetPassword = async (email: string, otp: string, password: string) => {

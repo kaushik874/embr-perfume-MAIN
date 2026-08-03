@@ -58,6 +58,27 @@ function normalizeHtmlContent(htmlContent: string) {
   return `<!doctype html><html><head><meta charset="utf-8"></head><body>${sanitized}</body></html>`;
 }
 
+function redactOtp(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replace(/\b\d{6}\b/g, "[redacted-otp]");
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(redactOtp);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
+        key,
+        redactOtp(nestedValue),
+      ]),
+    );
+  }
+
+  return value;
+}
+
 function postJson(url: string, apiKey: string, payload: unknown): Promise<BrevoResponse> {
   const requestUrl = new URL(url);
   const body = JSON.stringify(payload);
@@ -127,7 +148,7 @@ function logDiagnostics(args: {
         "api-key": "[redacted]",
         "content-type": "application/json",
       },
-      payload: args.payload,
+      payload: redactOtp(args.payload),
     },
     response: args.response
       ? {
@@ -166,7 +187,7 @@ export async function sendEmail(
 
   if (!apiKey) {
     console.warn("[Email] BREVO_API_KEY not configured. Skipping email send to:", recipientEmail || to);
-    return { success: false, message: "Email delivery is not configured." };
+    return { success: false, message: "Unable to send email. Please try again later." };
   }
 
   const payload = {
@@ -185,13 +206,13 @@ export async function sendEmail(
   if (!isEmailAddress(senderEmail)) {
     const error = new Error(`EMAIL_FROM must be a plain verified sender email address. Received: ${parsedSender.raw || "[empty]"}`);
     logDiagnostics({ payload, error, senderRaw: parsedSender.raw, senderEmail });
-    return { success: false, message: error.message };
+    return { success: false, message: "Unable to send email. Please try again later." };
   }
 
   if (!isEmailAddress(recipientEmail)) {
     const error = new Error(`Recipient email is invalid: ${to}`);
     logDiagnostics({ payload, error, senderRaw: parsedSender.raw, senderEmail });
-    return { success: false, message: error.message };
+    return { success: false, message: "Unable to send email. Please try again later." };
   }
 
   try {
@@ -201,7 +222,7 @@ export async function sendEmail(
       const error = new Error(`Brevo API error (${response.status}): ${response.body}`);
       logDiagnostics({ payload, response, error, senderRaw: parsedSender.raw, senderEmail });
       console.error("[Email] Brevo provider error:", error.stack);
-      return { success: false, message: error.message };
+      return { success: false, message: "Unable to send email. Please try again later." };
     }
 
     logDiagnostics({ payload, response, senderRaw: parsedSender.raw, senderEmail });
@@ -219,6 +240,6 @@ export async function sendEmail(
   } catch (error) {
     logDiagnostics({ payload, error, senderRaw: parsedSender.raw, senderEmail });
     console.error("[Email] Network/HTTP Error:", error);
-    return { success: false, message: "Error communicating with email provider." };
+    return { success: false, message: "Unable to send email. Please try again later." };
   }
 }

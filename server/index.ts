@@ -105,6 +105,8 @@ app.use(csrfProtection);
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter, blockRepeatedFailedLogins);
 app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/forgot-password", otpLimiter);
+app.use("/api/auth/otp", otpLimiter);
 app.use("/api/otp", otpLimiter);
 app.use(sanitizeBody);
 

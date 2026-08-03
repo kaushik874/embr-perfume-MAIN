@@ -17,6 +17,7 @@ const registerSchema = z.object({
   name: z.string().min(2).max(80),
   email: z.string().email(),
   password: z.string().min(6).max(128),
+  otp: z.string().regex(/^[0-9]{6}$/),
 });
 
 const loginSchema = z.object({
@@ -44,6 +45,41 @@ const COOKIE_OPTS = {
   path: "/",
 };
 
+const OTP_EXPIRY_SQL = "CURRENT_TIMESTAMP + INTERVAL '5 minutes'";
+const OTP_COOLDOWN_SQL = "CURRENT_TIMESTAMP - INTERVAL '60 seconds'";
+const VERIFICATION_EMAIL_SENT = "Verification email sent. Please check your inbox.";
+const RESET_EMAIL_SENT = "If an account exists, a verification email has been sent.";
+const EMAIL_SEND_FAILED = "We could not send the verification email. Please try again later.";
+const OTP_INVALID = "Verification code expired or invalid.";
+const OTP_TOO_MANY_ATTEMPTS = "Too many failed attempts. Please request a new code.";
+const OTP_COOLDOWN = "Please wait before requesting a new verification email.";
+
+async function hasRecentEmailOtp(email: string, purpose: "signup" | "reset") {
+  const row = await db.prepare(`
+    SELECT id FROM email_otps
+    WHERE email = ?
+      AND purpose = ?
+      AND created_at > ${OTP_COOLDOWN_SQL}
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(email, purpose);
+
+  return Boolean(row);
+}
+
+async function hasRecentLoginOtp(identifier: string, channel: "email" | "mobile") {
+  const row = await db.prepare(`
+    SELECT id FROM otp_codes
+    WHERE identifier = ?
+      AND channel = ?
+      AND created_at > ${OTP_COOLDOWN_SQL}
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(identifier, channel);
+
+  return Boolean(row);
+}
+
 function setAuthCookie(res: import("express").Response, token: string) {
   res.cookie("embr_token", token, COOKIE_OPTS);
 }
@@ -64,6 +100,11 @@ router.post("/otp/send-signup", async (req, res) => {
     return;
   }
 
+  if (await hasRecentEmailOtp(email, "signup")) {
+    res.status(429).json({ error: OTP_COOLDOWN });
+    return;
+  }
+
   // Generate and save OTP
   const otp = String(crypto.randomInt(100000, 1000000));
   const otpHash = bcrypt.hashSync(otp, 10);
@@ -73,27 +114,18 @@ router.post("/otp/send-signup", async (req, res) => {
 
   await db.prepare(`
     INSERT INTO email_otps (email, purpose, otp_hash, expires_at)
-    VALUES (?, 'signup', ?, (CURRENT_TIMESTAMP + INTERVAL '5 minutes'))
+    VALUES (?, 'signup', ?, (${OTP_EXPIRY_SQL}))
   `).run(email, otpHash);
 
-  // Send via Brevo
   const emailRes = await sendEmail(email, undefined, "Verify your Email - Embr Perfume", otpEmail(otp));
-  
-  let deliveryMessage = "OTP sent to your email";
-  let demoOtp: string | undefined;
 
-  if (!emailRes.success && process.env.NODE_ENV !== "production") {
-    demoOtp = otp;
-    deliveryMessage = "Email delivery not configured. Use code shown on screen.";
-  } else if (!emailRes.success) {
-    res.status(500).json({ error: "Failed to send OTP email. Please try again later." });
+  if (!emailRes.success) {
+    await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE email = ? AND purpose = 'signup' AND consumed_at IS NULL").run(email);
+    res.status(500).json({ error: EMAIL_SEND_FAILED });
     return;
   }
 
-  const responsePayload: Record<string, unknown> = { ok: true, message: deliveryMessage };
-  if (demoOtp) responsePayload.demoOtp = demoOtp;
-
-  res.json(responsePayload);
+  res.json({ ok: true, message: VERIFICATION_EMAIL_SENT });
 });
 
 router.post("/register", async (req, res) => {
@@ -103,7 +135,7 @@ router.post("/register", async (req, res) => {
     return;
   }
 
-  const { name, password } = parsed.data;
+  const { name, password, otp } = parsed.data;
   const email = parsed.data.email.toLowerCase();
 
   const existing = await db
@@ -112,6 +144,37 @@ router.post("/register", async (req, res) => {
 
   if (existing) {
     res.status(409).json({ error: "Email already registered" });
+    return;
+  }
+
+  const otpRow = await db.prepare(`
+    SELECT id, otp_hash, attempts FROM email_otps
+    WHERE email = ?
+      AND purpose = 'signup'
+      AND consumed_at IS NULL
+      AND expires_at > CURRENT_TIMESTAMP
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(email) as { id: number, otp_hash: string, attempts: number } | undefined;
+
+  if (!otpRow) {
+    res.status(401).json({ error: OTP_INVALID });
+    return;
+  }
+
+  if (otpRow.attempts >= 5) {
+    await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(otpRow.id);
+    res.status(429).json({ error: OTP_TOO_MANY_ATTEMPTS });
+    return;
+  }
+
+  if (!bcrypt.compareSync(otp, otpRow.otp_hash)) {
+    if (otpRow.attempts >= 4) {
+      await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP, attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
+    } else {
+      await db.prepare("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
+    }
+    res.status(401).json({ error: OTP_INVALID });
     return;
   }
 
@@ -125,6 +188,7 @@ router.post("/register", async (req, res) => {
 
   const token = signToken({ userId: Number(result.lastInsertRowid), email, role: "user" });
   setAuthCookie(res, token);
+  await db.prepare("DELETE FROM email_otps WHERE id = ?").run(otpRow.id);
 
   // Send Welcome Email asynchronously
   sendEmail(email, name, "Welcome to Embr Perfume", welcomeEmail(name)).catch(console.error);
@@ -166,24 +230,25 @@ router.post("/forgot-password", async (req, res) => {
         created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
 
+      if (await hasRecentEmailOtp(email, "reset")) {
+        res.json({ ok: true, message: RESET_EMAIL_SENT });
+        return;
+      }
+
       await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE email = ? AND purpose = 'reset' AND consumed_at IS NULL").run(email);
       
-      await db.prepare(`
+      const insertResult = await db.prepare(`
         INSERT INTO email_otps (email, purpose, otp_hash, expires_at)
-        VALUES (?, 'reset', ?, (CURRENT_TIMESTAMP + INTERVAL '10 minutes'))
+        VALUES (?, 'reset', ?, (${OTP_EXPIRY_SQL}))
       `).run(email, otpHash);
 
       const emailRes = await sendEmail(email, undefined, "Reset your password - Embr Perfume", otpEmail(otp));
       
       if (!emailRes.success) {
-        console.error("[OTP] Email failed to send via Brevo");
-        if (process.env.NODE_ENV !== "production") {
-          res.json({ ok: true, message: "Email delivery failed (check Brevo settings). Using demo OTP.", demoOtp: otp });
-          return;
-        } else {
-          res.status(500).json({ error: "Failed to send reset email due to provider error. Please check Brevo configuration." });
-          return;
-        }
+        console.error("[OTP] Password reset email failed to send.");
+        await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(insertResult.lastInsertRowid);
+        res.status(500).json({ error: EMAIL_SEND_FAILED });
+        return;
       }
     } catch (err) {
       console.error("[OTP Error]", err);
@@ -192,7 +257,7 @@ router.post("/forgot-password", async (req, res) => {
     }
   }
 
-  res.json({ ok: true, message: "If an account exists, a reset code has been sent." });
+  res.json({ ok: true, message: RESET_EMAIL_SENT });
 });
 
 const resetPasswordSchema = z.object({
@@ -218,19 +283,23 @@ router.post("/reset-password", async (req, res) => {
   `).get(email) as { id: number, otp_hash: string, attempts: number } | undefined;
 
   if (!otpRow) {
-    res.status(401).json({ error: "Reset code expired or invalid" });
+    res.status(401).json({ error: OTP_INVALID });
     return;
   }
 
   if (otpRow.attempts >= 5) {
     await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(otpRow.id);
-    res.status(429).json({ error: "Too many failed attempts. Please request a new code." });
+    res.status(429).json({ error: OTP_TOO_MANY_ATTEMPTS });
     return;
   }
 
   if (!bcrypt.compareSync(otp, otpRow.otp_hash)) {
-    await db.prepare("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
-    res.status(401).json({ error: "Invalid reset code" });
+    if (otpRow.attempts >= 4) {
+      await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP, attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
+    } else {
+      await db.prepare("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
+    }
+    res.status(401).json({ error: OTP_INVALID });
     return;
   }
 
@@ -240,7 +309,7 @@ router.post("/reset-password", async (req, res) => {
     return;
   }
 
-  await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(otpRow.id);
+  await db.prepare("DELETE FROM email_otps WHERE id = ?").run(otpRow.id);
   
   const password_hash = bcrypt.hashSync(password, 10);
   await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(password_hash, user.id);
@@ -304,37 +373,38 @@ router.post("/otp/request", async (req, res) => {
   const otpHash = bcrypt.hashSync(otp, 10);
   const destination = channel === "email" ? user.email : identifier;
 
-  await db.prepare(`
+  if (await hasRecentLoginOtp(identifier, channel)) {
+    res.status(429).json({ error: "Please wait before requesting a new verification code." });
+    return;
+  }
+
+  const insertResult = await db.prepare(`
     INSERT INTO otp_codes (user_id, identifier, channel, otp_hash, expires_at)
-    VALUES (?, ?, ?, ?, datetime('now', '+10 minutes'))
+    VALUES (?, ?, ?, ?, (${OTP_EXPIRY_SQL}))
   `).run(user.id, identifier, channel, otpHash);
 
   let deliveryMessage = `OTP sent to your ${channel === "email" ? "email" : "mobile number"}`;
-  let demoOtp: string | undefined;
 
   try {
     const delivery = await deliverOtp(channel, destination, otp);
     deliveryMessage = delivery.message;
-    // Only expose OTP when delivery genuinely failed (dev/demo mode only)
-    if (!delivery.delivered && process.env.NODE_ENV !== "production") {
-      demoOtp = otp;
+    if (!delivery.delivered) {
+      await db.prepare("UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(insertResult.lastInsertRowid);
+      res.status(500).json({
+        error: channel === "email" ? EMAIL_SEND_FAILED : "We could not send the verification code. Please try again later.",
+      });
+      return;
     }
   } catch (err) {
     console.error("[OTP] Delivery failed:", err);
-    // In production, never expose OTP in response even on error
-    if (process.env.NODE_ENV !== "production") {
-      deliveryMessage = "Use the verification code shown on screen.";
-      demoOtp = otp;
-    } else {
-      deliveryMessage = "OTP delivery failed. Please try again or contact support.";
-    }
+    await db.prepare("UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(insertResult.lastInsertRowid);
+    res.status(500).json({
+      error: channel === "email" ? EMAIL_SEND_FAILED : "We could not send the verification code. Please try again later.",
+    });
+    return;
   }
 
-  // Never return OTP in production
-  const responsePayload: Record<string, unknown> = { ok: true, channel, message: deliveryMessage };
-  if (demoOtp && process.env.NODE_ENV !== "production") responsePayload.demoOtp = demoOtp;
-
-  res.json(responsePayload);
+  res.json({ ok: true, channel, message: deliveryMessage });
 });
 
 router.post("/otp/verify", async (req, res) => {
@@ -346,7 +416,7 @@ router.post("/otp/verify", async (req, res) => {
 
   const identifier = parsed.data.identifier.trim().toLowerCase();
   const otpRow = await db.prepare(`
-    SELECT o.id, o.otp_hash, o.user_id, u.email, u.name, u.role
+    SELECT o.id, o.otp_hash, o.attempts, o.user_id, u.email, u.name, u.role
     FROM otp_codes o
     JOIN users u ON u.id = o.user_id
     WHERE o.identifier = ?
@@ -355,15 +425,31 @@ router.post("/otp/verify", async (req, res) => {
     ORDER BY o.id DESC
     LIMIT 1
   `).get(identifier) as
-    | { id: number; otp_hash: string; user_id: number; email: string; name: string; role: string }
+    | { id: number; otp_hash: string; attempts: number; user_id: number; email: string; name: string; role: string }
     | undefined;
 
-  if (!otpRow || !bcrypt.compareSync(parsed.data.otp, otpRow.otp_hash)) {
+  if (!otpRow) {
     res.status(401).json({ error: "Invalid or expired OTP" });
     return;
   }
 
-  await db.prepare("UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?").run(otpRow.id);
+  if (otpRow.attempts >= 5) {
+    await db.prepare("UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(otpRow.id);
+    res.status(429).json({ error: OTP_TOO_MANY_ATTEMPTS });
+    return;
+  }
+
+  if (!bcrypt.compareSync(parsed.data.otp, otpRow.otp_hash)) {
+    if (otpRow.attempts >= 4) {
+      await db.prepare("UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP, attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
+    } else {
+      await db.prepare("UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
+    }
+    res.status(401).json({ error: "Invalid or expired OTP" });
+    return;
+  }
+
+  await db.prepare("DELETE FROM otp_codes WHERE id = ?").run(otpRow.id);
   setSessionCookie(res, otpRow.user_id, otpRow.email, otpRow.role);
   logSuccessfulLogin(otpRow.email, req.ip || req.socket.remoteAddress || "unknown");
   await db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(otpRow.user_id);

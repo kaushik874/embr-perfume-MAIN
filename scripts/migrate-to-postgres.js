@@ -246,6 +246,7 @@ const FULL_SCHEMA = `
     channel TEXT NOT NULL,
     otp_hash TEXT NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
     consumed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
