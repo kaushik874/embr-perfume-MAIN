@@ -5,24 +5,15 @@ import { Header } from "@/components/site/Header";
 import { api, HeroBanner } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const HERO_CACHE_KEY = "embr_hero_banners";
-
-function getCachedBanners(): HeroBanner[] {
-  try {
-    const raw = sessionStorage.getItem(HERO_CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
 export function Hero() {
-  const [banners, setBanners] = useState<HeroBanner[]>(getCachedBanners);
+  const [banners, setBanners] = useState<HeroBanner[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     api.getHeroBanners().then((res) => {
       setBanners(res.banners);
-      try { sessionStorage.setItem(HERO_CACHE_KEY, JSON.stringify(res.banners)); } catch {}
-    }).catch(console.error);
+    }).catch(console.error).finally(() => setLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -37,18 +28,16 @@ export function Hero() {
   const prevSlide = () => setCurrent((c) => (c - 1 + banners.length) % banners.length);
   const goToSlide = (idx: number) => setCurrent(idx);
 
-  if (banners.length === 0) {
+  if (!loaded) {
     return (
       <>
         <Header variant="light" />
-        <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-page">
-          <div className="absolute inset-0 flex items-center justify-center text-white/50">
-            Loading Hero...
-          </div>
-        </section>
+        <section className="relative min-h-[calc(100svh-5rem)] overflow-hidden bg-page" />
       </>
     );
   }
+
+  if (banners.length === 0) return <Header variant="light" />;
 
   const activeBanner = banners[current];
   const shopLink = activeBanner.productUrl || activeBanner.buttonLink;

@@ -49,7 +49,7 @@ const OTP_EXPIRY_SQL = "CURRENT_TIMESTAMP + INTERVAL '5 minutes'";
 const OTP_COOLDOWN_SQL = "CURRENT_TIMESTAMP - INTERVAL '60 seconds'";
 const VERIFICATION_EMAIL_SENT = "Verification email sent. Please check your inbox.";
 const RESET_EMAIL_SENT = "If an account exists, a verification email has been sent.";
-const EMAIL_SEND_FAILED = "We could not send the verification email. Please try again later.";
+const EMAIL_SEND_FAILED = "We couldn't send the verification email. Please try again.";
 const OTP_INVALID = "Verification code expired or invalid.";
 const OTP_TOO_MANY_ATTEMPTS = "Too many failed attempts. Please request a new code.";
 const OTP_COOLDOWN = "Please wait before requesting a new verification email.";
@@ -59,6 +59,7 @@ async function hasRecentEmailOtp(email: string, purpose: "signup" | "reset") {
     SELECT id FROM email_otps
     WHERE email = ?
       AND purpose = ?
+      AND consumed_at IS NULL
       AND created_at > ${OTP_COOLDOWN_SQL}
     ORDER BY id DESC
     LIMIT 1
@@ -72,6 +73,7 @@ async function hasRecentLoginOtp(identifier: string, channel: "email" | "mobile"
     SELECT id FROM otp_codes
     WHERE identifier = ?
       AND channel = ?
+      AND consumed_at IS NULL
       AND created_at > ${OTP_COOLDOWN_SQL}
     ORDER BY id DESC
     LIMIT 1
@@ -120,7 +122,7 @@ router.post("/otp/send-signup", async (req, res) => {
   const emailRes = await sendEmail(email, undefined, "Verify your Email - Embr Perfume", otpEmail(otp));
 
   if (!emailRes.success) {
-    await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE email = ? AND purpose = 'signup' AND consumed_at IS NULL").run(email);
+    await db.prepare("DELETE FROM email_otps WHERE email = ? AND purpose = 'signup' AND consumed_at IS NULL").run(email);
     res.status(500).json({ error: EMAIL_SEND_FAILED });
     return;
   }
@@ -246,7 +248,7 @@ router.post("/forgot-password", async (req, res) => {
       
       if (!emailRes.success) {
         console.error("[OTP] Password reset email failed to send.");
-        await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(insertResult.lastInsertRowid);
+        await db.prepare("DELETE FROM email_otps WHERE id = ?").run(insertResult.lastInsertRowid);
         res.status(500).json({ error: EMAIL_SEND_FAILED });
         return;
       }
@@ -389,7 +391,7 @@ router.post("/otp/request", async (req, res) => {
     const delivery = await deliverOtp(channel, destination, otp);
     deliveryMessage = delivery.message;
     if (!delivery.delivered) {
-      await db.prepare("UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(insertResult.lastInsertRowid);
+      await db.prepare("DELETE FROM otp_codes WHERE id = ?").run(insertResult.lastInsertRowid);
       res.status(500).json({
         error: channel === "email" ? EMAIL_SEND_FAILED : "We could not send the verification code. Please try again later.",
       });
@@ -397,7 +399,7 @@ router.post("/otp/request", async (req, res) => {
     }
   } catch (err) {
     console.error("[OTP] Delivery failed:", err);
-    await db.prepare("UPDATE otp_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(insertResult.lastInsertRowid);
+    await db.prepare("DELETE FROM otp_codes WHERE id = ?").run(insertResult.lastInsertRowid);
     res.status(500).json({
       error: channel === "email" ? EMAIL_SEND_FAILED : "We could not send the verification code. Please try again later.",
     });

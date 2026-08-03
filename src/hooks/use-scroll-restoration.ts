@@ -1,132 +1,139 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 
-/**
- * useScrollRestoration — saves scroll position per route and restores it on
- * back/forward navigation. For forward (push) navigations the page scrolls to top.
- */
-
 const SCROLL_KEY_PREFIX = "embr_scroll_";
+const RESTORE_DELAYS = [0, 50, 150, 300, 600, 1000];
+
+type NavigationKind = "push" | "replace" | "pop";
+
+let lastNavigationKind: NavigationKind = "push";
+let historyPatched = false;
+let activeScrollKey = "";
+
+function getScrollKey() {
+  return `${window.location.pathname}${window.location.search}`;
+}
 
 function saveScroll(path: string) {
-  try { sessionStorage.setItem(SCROLL_KEY_PREFIX + path, String(window.scrollY)); } catch {}
+  try {
+    sessionStorage.setItem(SCROLL_KEY_PREFIX + path, String(window.scrollY));
+  } catch {}
 }
 
 function getSavedScroll(path: string): number | null {
   try {
-    const v = sessionStorage.getItem(SCROLL_KEY_PREFIX + path);
-    return v !== null ? Number(v) : null;
-  } catch { return null; }
+    const value = sessionStorage.getItem(SCROLL_KEY_PREFIX + path);
+    return value === null ? null : Number(value);
+  } catch {
+    return null;
+  }
+}
+
+function restoreScroll(path: string) {
+  const saved = getSavedScroll(path);
+  if (saved === null || Number.isNaN(saved)) return;
+
+  RESTORE_DELAYS.forEach((delay) => {
+    const restore = () => window.scrollTo({ top: saved, left: 0, behavior: "auto" });
+
+    if (delay === 0) {
+      requestAnimationFrame(restore);
+    } else {
+      window.setTimeout(restore, delay);
+    }
+  });
+}
+
+function saveActiveScroll() {
+  saveScroll(activeScrollKey || getScrollKey());
+}
+
+function patchHistoryForScroll() {
+  if (historyPatched || typeof window === "undefined") return;
+  historyPatched = true;
+  activeScrollKey = getScrollKey();
+
+  if ("scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
+
+  const originalPushState = window.history.pushState;
+  const originalReplaceState = window.history.replaceState;
+
+  window.history.pushState = function pushState(...args) {
+    saveActiveScroll();
+    lastNavigationKind = "push";
+    return originalPushState.apply(this, args);
+  };
+
+  window.history.replaceState = function replaceState(...args) {
+    saveActiveScroll();
+    lastNavigationKind = "replace";
+    return originalReplaceState.apply(this, args);
+  };
+
+  window.addEventListener("popstate", () => {
+    saveActiveScroll();
+    lastNavigationKind = "pop";
+  });
 }
 
 export function useScrollRestoration() {
   const [location] = useLocation();
-  const prevLocationRef = useRef<string | null>(null);
+  const previousKeyRef = useRef<string | null>(null);
 
-  // 1. Continuously save scroll position for the current location
   useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    
+    patchHistoryForScroll();
+  }, []);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    const persist = () => saveScroll(getScrollKey());
     const handleScroll = () => {
       if (timeout) clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        saveScroll(location);
-      }, 50); // Debounce to avoid excessive writes
+      timeout = setTimeout(persist, 80);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") persist();
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    
-    // Save immediately on mount in case they navigate away before scrolling
-    saveScroll(location);
+    window.addEventListener("pagehide", persist);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    persist();
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("pagehide", persist);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (timeout) clearTimeout(timeout);
+      persist();
     };
   }, [location]);
 
-  // 2. Handle restoration on location change
   useEffect(() => {
-    if (prevLocationRef.current === null) {
-      prevLocationRef.current = location;
+    const currentKey = getScrollKey();
+    const previousKey = previousKeyRef.current;
+
+    if (previousKey === null) {
+      previousKeyRef.current = currentKey;
+      activeScrollKey = currentKey;
+      restoreScroll(currentKey);
       return;
     }
 
-    if (prevLocationRef.current === location) {
+    if (previousKey === currentKey) return;
+
+    saveScroll(previousKey);
+    previousKeyRef.current = currentKey;
+    activeScrollKey = currentKey;
+
+    if (lastNavigationKind === "pop") {
+      restoreScroll(currentKey);
       return;
     }
 
-    // Force one last save before we process the change
-    saveScroll(prevLocationRef.current);
-    prevLocationRef.current = location;
-
-    // Detect back / forward traversal
-    let isBackForward = false;
-
-    try {
-      const nav = (window as any).navigation;
-      if (nav && nav.currentEntry) {
-        isBackForward = _lastNavigationType === "traverse";
-      }
-    } catch {
-      // API not available
-    }
-
-    if (!isBackForward) {
-      try {
-        const entries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
-        if (entries.length > 0 && entries[0].type === "back_forward") {
-          isBackForward = true;
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    if (isBackForward) {
-      // Restore saved scroll position for the route we are returning to.
-      const saved = getSavedScroll(location);
-      if (saved !== null && saved > 0) {
-        // Use multiple attempts with increasing delays to handle async content rendering
-        // Extended delays added because Home Page has images/banners that take time to expand
-        const attempts = [0, 50, 150, 300, 500, 800, 1200];
-        
-        attempts.forEach((delay) => {
-          if (delay === 0) {
-            requestAnimationFrame(() => {
-              window.scrollTo({ top: saved, left: 0, behavior: "instant" });
-            });
-          } else {
-            setTimeout(() => {
-              window.scrollTo({ top: saved, left: 0, behavior: "instant" });
-            }, delay);
-          }
-        });
-      }
-    } else {
-      // Forward navigation — scroll to top instantly.
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    }
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [location]);
 }
-
-// ── Navigation API event listener (module-level, set up once) ────────────────
-let _lastNavigationType: string = "push";
-
-try {
-  const nav = (window as any).navigation;
-  if (nav) {
-    nav.addEventListener("navigate", (event: any) => {
-      _lastNavigationType = event.navigationType ?? "push";
-      
-      // Attempt to save synchronously right as navigation starts
-      try {
-        const currentPath = new URL(nav.currentEntry?.url || window.location.href).pathname;
-        saveScroll(currentPath);
-      } catch {}
-    });
-  }
-} catch {
-  // Navigation API not available
-}
-

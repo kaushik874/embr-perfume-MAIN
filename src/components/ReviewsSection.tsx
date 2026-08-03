@@ -10,13 +10,27 @@ interface ReviewsSectionProps {
   product: Product;
 }
 
+function getReviewStateKey(slug: string) {
+  return `embr_reviews_${slug}`;
+}
+
+function getSavedReviewState(slug: string): { sort?: string; showAll?: boolean } {
+  try {
+    const raw = sessionStorage.getItem(getReviewStateKey(slug));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function ReviewsSection({ product }: ReviewsSectionProps) {
   const { user } = useAuth();
-  const [sort, setSort] = useState("newest");
+  const savedReviewState = getSavedReviewState(product.slug);
+  const [sort, setSort] = useState(savedReviewState.sort || "newest");
   const [isWriting, setIsWriting] = useState(false);
   const [editingReview, setEditingReview] = useState<any>(null);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(Boolean(savedReviewState.showAll));
   const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'video' | 'image'} | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +63,12 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
 
   const reviews = reviewsData?.reviews || [];
   const displayedReviews = showAll ? reviews : reviews.slice(0, 3);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(getReviewStateKey(product.slug), JSON.stringify({ sort, showAll }));
+    } catch {}
+  }, [product.slug, showAll, sort]);
   
   const allVideos = reviews.filter((r: any) => r.video).map((r: any) => ({
     url: r.video,
@@ -96,6 +116,31 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
       }, 100);
     }
   }, [isWriting]);
+
+  useEffect(() => {
+    if (!selectedMedia) return;
+
+    const handlePopState = () => setSelectedMedia(null);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [selectedMedia]);
+
+  const openMedia = (media: { url: string; type: "video" | "image" }) => {
+    if (!selectedMedia) {
+      const url = new URL(window.location.href);
+      url.hash = "review-media";
+      window.history.pushState({ ...(window.history.state || {}), embrModal: "review-media" }, "", url);
+    }
+    setSelectedMedia(media);
+  };
+
+  const closeMedia = () => {
+    if (window.history.state?.embrModal === "review-media") {
+      window.history.back();
+      return;
+    }
+    setSelectedMedia(null);
+  };
 
   return (
     <div id="reviews" className="py-12 border-t border-border-light">
@@ -195,7 +240,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
             {allVideos.map((v: any, i: number) => (
               <div 
                 key={i} 
-                onClick={() => setSelectedMedia({ url: v.url, type: 'video' })}
+                onClick={() => openMedia({ url: v.url, type: 'video' })}
                 className="relative w-32 h-32 flex-shrink-0 bg-black rounded-md overflow-hidden group cursor-pointer border border-border-light"
               >
                 <video src={v.url} className="w-full h-full object-cover opacity-80" />
@@ -264,7 +309,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
                 <div className="flex gap-4 mt-4 overflow-x-auto pb-2">
                   {review.video && (
                     <div 
-                      onClick={() => setSelectedMedia({ url: review.video, type: 'video' })}
+                      onClick={() => openMedia({ url: review.video, type: 'video' })}
                       className="relative w-24 h-24 flex-shrink-0 bg-black rounded-md overflow-hidden group cursor-pointer"
                     >
                       <video src={review.video} className="w-full h-full object-cover opacity-80" />
@@ -276,7 +321,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
                   {review.images && review.images.map((img: string, i: number) => (
                     <div 
                       key={i} 
-                      onClick={() => setSelectedMedia({ url: img, type: 'image' })}
+                      onClick={() => openMedia({ url: img, type: 'image' })}
                       className="relative w-24 h-24 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden border border-border-light cursor-pointer group"
                     >
                       <img src={img} alt="Review attachment" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
@@ -302,7 +347,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
       {selectedMedia && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
           <button 
-            onClick={() => setSelectedMedia(null)}
+            onClick={closeMedia}
             className="absolute top-4 right-4 p-2 text-white hover:text-gold-light transition-colors"
           >
             <X className="w-8 h-8" />

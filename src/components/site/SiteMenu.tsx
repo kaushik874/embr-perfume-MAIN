@@ -21,7 +21,7 @@ type SiteMenuProps = {
 export function SiteMenu({ variant = "light" }: SiteMenuProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const { getVal } = useSiteContent();
+  const { getVal, isReady } = useSiteContent();
   const isLight = variant === "light";
 
   return (
@@ -41,11 +41,15 @@ export function SiteMenu({ variant = "light" }: SiteMenuProps) {
       <SheetContent side="left" className="w-[min(100vw,320px)] border-border-light bg-page">
         <SheetHeader className="border-b border-border-light pb-6 text-left">
           <SheetTitle className="font-display text-2xl tracking-widest text-ink">
-            <img
-              src={getVal("site_logo", SITE_LOGO)}
-              alt={getVal("site_name", SITE_NAME)}
-              className="h-8 object-contain"
-            />
+            {isReady ? (
+              <img
+                src={getVal("site_logo", SITE_LOGO)}
+                alt={getVal("site_name", SITE_NAME)}
+                className="h-8 object-contain"
+              />
+            ) : (
+              <span className="block h-8 w-20" aria-hidden="true" />
+            )}
           </SheetTitle>
         </SheetHeader>
         <nav className="mt-6 flex flex-col gap-1">

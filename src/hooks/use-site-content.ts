@@ -8,12 +8,13 @@ export function useSiteContent() {
     staleTime: 5 * 60 * 1000, // Cache for 5 mins
   });
 
+  const isReady = !isLoading && Boolean(data);
   const content = data?.content || {};
   const sections = data?.sections || {};
 
-  // Helper to fallback safely
-  const getVal = (key: string, fallback: string) => content[key] || fallback;
-  const isHidden = (key: string) => sections[key] === true;
+  // Admin-managed content should not show fallback values before settings load.
+  const getVal = (key: string, fallback: string) => isReady ? (content[key] || fallback) : "";
+  const isHidden = (key: string) => !isReady || sections[key] === true;
 
-  return { content, sections, getVal, isHidden, isLoading };
+  return { content, sections, getVal, isHidden, isLoading, isReady };
 }

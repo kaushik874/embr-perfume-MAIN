@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { adminApi, HeroBanner } from "@/lib/api";
 import { AdminLayout } from "./AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ const TABS = [
 ];
 
 export function AdminContent() {
+  const queryClient = useQueryClient();
   const [content, setContent] = useState<Record<string, string>>({});
   const [sections, setSections] = useState<Record<string, boolean>>({});
   const [heroBanners, setHeroBanners] = useState<HeroBanner[]>([]);
@@ -32,6 +34,10 @@ export function AdminContent() {
   // Custom key form
   const [newKey, setNewKey] = useState("");
   const [newVal, setNewVal] = useState("");
+
+  const refreshPublicContent = () => {
+    queryClient.invalidateQueries({ queryKey: ["site-content"] });
+  };
 
   const loadData = async () => {
     try {
@@ -102,6 +108,7 @@ export function AdminContent() {
     setBusy(k);
     try {
       await adminApi.updateContent(k, content[k] || "");
+      refreshPublicContent();
       if (k === "hero_image" && content[k]) {
         const res = await adminApi.createHeroBanner(buildHeroBannerFromContent(content[k]));
         const { banners } = await adminApi.getHeroBanners();
@@ -130,6 +137,7 @@ export function AdminContent() {
             ? await adminApi.uploadHeroBannerImage({ name: file.name, data: reader.result as string })
             : await adminApi.uploadContentFile({ name: file.name, data: reader.result as string });
           await adminApi.updateContent(key, res.url);
+          refreshPublicContent();
           setContent(prev => ({ ...prev, [key]: res.url }));
           if (key === "hero_image") {
             const created = await adminApi.createHeroBanner(buildHeroBannerFromContent(res.url));
@@ -159,6 +167,7 @@ export function AdminContent() {
     
     try {
       await adminApi.updateSection(key, !isHidden);
+      refreshPublicContent();
       setSections(prev => ({ ...prev, [key]: !isHidden }));
       toast.success(`Section ${!isHidden ? "hidden" : "visible"}`);
     } catch {
@@ -170,6 +179,7 @@ export function AdminContent() {
 
     try {
       await adminApi.deleteContent(k);
+      refreshPublicContent();
       setContent(prev => { delete prev[k]; return { ...prev }; });
       toast.success("Deleted successfully");
     } catch {
@@ -613,6 +623,7 @@ export function AdminContent() {
                         const next = current ? "0" : "1";
                         handleChange("story_show_bg_image", next);
                         await adminApi.updateContent("story_show_bg_image", next);
+                        refreshPublicContent();
                         toast.success(next === "1" ? "Hero mode ON" : "Hero mode OFF");
                       }}
                       className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
@@ -678,6 +689,7 @@ export function AdminContent() {
                         const next = current ? "1" : "0";
                         handleChange("story_dark_overlay", next);
                         await adminApi.updateContent("story_dark_overlay", next);
+                        refreshPublicContent();
                       }}
                       className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                         content["story_dark_overlay"] !== "0" ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
@@ -699,6 +711,7 @@ export function AdminContent() {
                         const next = current ? "0" : "1";
                         handleChange("story_show_button", next);
                         await adminApi.updateContent("story_show_button", next);
+                        refreshPublicContent();
                       }}
                       className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                         content["story_show_button"] === "1" ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
@@ -931,6 +944,7 @@ export function AdminContent() {
                       setBusy('new');
                       try {
                         await adminApi.updateContent(newKey, newVal);
+                        refreshPublicContent();
                         setContent(prev => ({...prev, [newKey]: newVal}));
                         setNewKey(""); setNewVal("");
                         toast.success("Added new key");

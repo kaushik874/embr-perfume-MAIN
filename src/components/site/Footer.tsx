@@ -4,25 +4,15 @@ import { useSiteContent } from "@/hooks/use-site-content";
 import { api, FooterColumn } from "@/lib/api";
 import { SITE_LOGO, SITE_NAME } from "@/lib/site-brand";
 
-const FOOTER_CACHE_KEY = "embr_footer_columns";
-
-function getCachedFooter(): FooterColumn[] {
-  try {
-    const raw = sessionStorage.getItem(FOOTER_CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
 export function Footer() {
-  const { getVal } = useSiteContent();
-  const [columns, setColumns] = useState<FooterColumn[]>(getCachedFooter);
+  const { getVal, isReady } = useSiteContent();
+  const [columns, setColumns] = useState<FooterColumn[]>([]);
+  const siteLogo = getVal("site_logo", SITE_LOGO);
+  const siteName = getVal("site_name", SITE_NAME);
 
   useEffect(() => {
     api.getFooter()
-      .then((res) => {
-        setColumns(res.columns);
-        try { sessionStorage.setItem(FOOTER_CACHE_KEY, JSON.stringify(res.columns)); } catch {}
-      })
+      .then((res) => setColumns(res.columns))
       .catch(() => {});
   }, []);
 
@@ -31,11 +21,15 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl grid-cols-3 gap-8 px-6 md:grid-cols-4 md:px-10">
         {/* Brand column - always first */}
         <div className="col-span-3 md:col-span-1">
-          <img
-            src={getVal("site_logo", SITE_LOGO)}
-            alt={getVal("site_name", SITE_NAME)}
-            className="mb-2 h-10 w-auto object-contain"
-          />
+          {isReady ? (
+            <img
+              src={siteLogo}
+              alt={siteName}
+              className="mb-2 h-10 w-auto object-contain"
+            />
+          ) : (
+            <span className="mb-2 block h-10 w-24" aria-hidden="true" />
+          )}
           <p className="mt-4 max-w-xs text-sm text-ink-muted leading-relaxed">
             {getVal("footer_tagline", "Luxury fragrances forged from fire, forest, petals, and the patience of time.")}
           </p>

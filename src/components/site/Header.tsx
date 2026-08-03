@@ -14,12 +14,13 @@ type HeaderProps = {
 export function Header({ variant = "dark", className }: HeaderProps) {
   const { user, logout } = useAuth();
   const { count } = useCart();
-  const { getVal } = useSiteContent();
+  const { getVal, isReady } = useSiteContent();
   const isLight = variant === "light";
   const text = isLight ? "text-ink" : "text-cream";
   const muted = isLight ? "text-ink-muted" : "text-cream/70";
   const brand = isLight ? "text-ink" : "text-gold";
   const siteName = getVal("site_name", SITE_NAME);
+  const siteLogo = getVal("site_logo", SITE_LOGO);
 
   const [location] = useLocation();
   const isCheckout = location.startsWith("/checkout");
@@ -34,11 +35,15 @@ export function Header({ variant = "dark", className }: HeaderProps) {
       <div className="flex items-center gap-3">
         <SiteMenu variant={variant} />
         <Link href="/" className={cn("flex items-center", brand)}>
-          <img
-            src={getVal("site_logo", SITE_LOGO)}
-            alt={siteName}
-            className="h-8 w-auto object-contain"
-          />
+          {isReady ? (
+            <img
+              src={siteLogo}
+              alt={siteName}
+              className="h-8 w-auto object-contain"
+            />
+          ) : (
+            <span className="block h-8 w-20" aria-hidden="true" />
+          )}
         </Link>
       </div>
 

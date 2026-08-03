@@ -62,7 +62,21 @@ function AccordionItem({
   item: ProductAccordion;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(Boolean(item.defaultOpen));
+  const storageKey = `embr_product_accordion_${window.location.pathname}_${item.id}`;
+  const [open, setOpen] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      return saved === null ? Boolean(item.defaultOpen) : saved === "1";
+    } catch {
+      return Boolean(item.defaultOpen);
+    }
+  });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storageKey, open ? "1" : "0");
+    } catch {}
+  }, [open, storageKey]);
 
   return (
     <div className="border-b border-border-light first:border-t">
