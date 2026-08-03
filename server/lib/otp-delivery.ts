@@ -1,7 +1,13 @@
 import nodemailer from "nodemailer";
+import { sendEmail } from "./email.js";
+import { otpEmail } from "./email-templates.js";
 
 function smtpConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
+function brevoConfigured() {
+  return Boolean(process.env.BREVO_API_KEY);
 }
 
 export async function deliverOtp(
@@ -9,6 +15,20 @@ export async function deliverOtp(
   destination: string,
   otp: string,
 ): Promise<{ delivered: boolean; message: string }> {
+  if (channel === "email" && brevoConfigured()) {
+    const result = await sendEmail(
+      destination,
+      undefined,
+      "Your Embr Perfume verification code",
+      otpEmail(otp),
+    );
+
+    return {
+      delivered: result.success,
+      message: result.success ? "OTP sent to your email" : result.message,
+    };
+  }
+
   if (channel === "email" && smtpConfigured()) {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
