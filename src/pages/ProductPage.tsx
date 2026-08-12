@@ -197,13 +197,13 @@ function ProductGallery({
           </div>
         ) : null}
 
-        <div className="order-1 flex min-h-[var(--mobile-image-height)] items-center justify-center overflow-hidden rounded-[var(--radius-setting)] border border-border-light bg-[#f7f7f5] lg:order-2 lg:min-h-[var(--main-image-height)]">
+        <div className="order-1 flex aspect-[943/1404] lg:aspect-auto w-full items-center justify-center overflow-hidden rounded-[var(--radius-setting)] border border-border-light bg-[#f7f7f5] lg:order-2 lg:min-h-[var(--main-image-height)]">
           <img
             src={mainImage}
             alt={product.name}
             fetchPriority="high"
             decoding="async"
-            className="h-[var(--gallery-image-height)] w-[var(--gallery-image-width)] object-cover"
+            className="h-full w-full object-cover lg:h-[var(--gallery-image-height)] lg:w-[var(--gallery-image-width)]"
           />
         </div>
       </div>
@@ -466,7 +466,7 @@ function RelatedProducts({ relatedProducts }: SectionRenderContext) {
             href={`/product/${product.slug}`}
             className="group block border border-border-light bg-white p-2 transition-colors hover:border-ink"
           >
-            <div className="aspect-square overflow-hidden bg-[#f7f7f5]">
+            <div className="aspect-[943/1404] md:aspect-square overflow-hidden bg-[#f7f7f5]">
               <img
                 src={product.image ?? "/images/bottle-mini.svg"}
                 alt={product.name}

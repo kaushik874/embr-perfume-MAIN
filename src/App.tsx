@@ -7,6 +7,7 @@ import { RegisterPage } from "@/pages/RegisterPage";
 import { CartPage } from "@/pages/CartPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
 import { PaymentPage } from "@/pages/PaymentPage";
+import { OrderSuccessPage, PaymentFailedPage } from "@/pages/PaymentResultPages";
 import { AccountPage } from "@/pages/AccountPage";
 import { ProductPage } from "@/pages/ProductPage";
 import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
@@ -90,6 +91,8 @@ function App() {
           <Route path="/register" component={RegisterPage} />
           <Route path="/cart" component={CartPage} />
           <Route path="/checkout/payment" component={PaymentPage} />
+          <Route path="/order-success/:orderId" component={OrderSuccessPage} />
+          <Route path="/payment-failed/:orderId" component={PaymentFailedPage} />
           <Route path="/checkout" component={CheckoutPage} />
           <Route path="/account" component={AccountPage} />
           <Route component={NotFound} />

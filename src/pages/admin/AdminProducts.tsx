@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { adminApi, type ProductFull, type Pagination } from "@/lib/admin-api";
 import { AdminLayout } from "./AdminLayout";
-import { ImageUpload } from "@/components/admin/ImageUpload";
-import { ImageCropperModal } from "@/components/admin/ImageCropper";
+import { FrameCropperModal, type FrameCrop } from "@/components/admin/ImageCropper";
 import { toast } from "sonner";
-import { Trash2, Crop } from "lucide-react";
+import { Trash2, Crop, Upload } from "lucide-react";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -14,6 +14,20 @@ function readFileAsDataUrl(file: File) {
     reader.readAsDataURL(file);
   });
 }
+
+function readFileAsRawBase64(file: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? "").split(",")[1] ?? "");
+    reader.onerror = () => reject(new Error("Could not read the image"));
+    reader.readAsDataURL(file);
+  });
+}
+
+const PRODUCT_IMAGE_ASPECT_RATIO = 943 / 1404;
+const PRODUCT_IMAGE_OUTPUT_WIDTH = 943;
+const PRODUCT_IMAGE_OUTPUT_HEIGHT = 1404;
+const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024;
 
 interface ProductForm {
   slug: string;
@@ -39,6 +53,16 @@ interface ProductForm {
   review: string;
 }
 
+type ProductImageItem = {
+  id: number;
+  url: string;
+  original_url?: string | null;
+  crop_x?: number | null;
+  crop_y?: number | null;
+  crop_zoom?: number | null;
+  sort_order: number;
+};
+
 const emptyForm: ProductForm = {
   slug: "", name: "", notes: "", description: "", price: 0, mrp: 0,
   discount_price: null, stock: 0, sku: "", category: "", status: "draft", tags: "", collection_type: "secondary", bestseller: false,
@@ -62,11 +86,13 @@ export function AdminProducts() {
   const [saving, setSaving] = useState(false);
   const [showImages, setShowImages] = useState<number | null>(null);
   // Gallery state for existing images
-  const [existingImages, setExistingImages] = useState<{ id: number; url: string; sort_order: number }[]>([]);
+  const [existingImages, setExistingImages] = useState<ProductImageItem[]>([]);
   const [loadingImages, setLoadingImages] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [savingImageOrder, setSavingImageOrder] = useState(false);
-  const [croppingImage, setCroppingImage] = useState<{ id: number; url: string; index: number } | null>(null);
+  const [croppingImage, setCroppingImage] = useState<(ProductImageItem & { index: number }) | null>(null);
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<File[]>([]);
+  const [uploadCrop, setUploadCrop] = useState<{ file: File; preview: string } | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -110,7 +136,7 @@ export function AdminProducts() {
     }
   };
 
-  const handleSaveCrop = async (croppedBlob: Blob) => {
+  const handleSaveCrop = async (croppedBlob: Blob, _crop?: FrameCrop) => {
     if (!croppingImage || showImages === null) return;
     setSavingImageOrder(true);
     try {
@@ -507,7 +533,7 @@ export function AdminProducts() {
                 <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Uploaded Images</p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                   {existingImages.map((img, idx) => (
-                    <div key={img.id} className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 aspect-square bg-gray-50 dark:bg-gray-900">
+                    <div key={img.id} className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 aspect-[943/1404] bg-gray-50 dark:bg-gray-900">
                       <img
                         src={img.url}
                         alt={`Product image ${idx + 1}`}
@@ -559,7 +585,7 @@ export function AdminProducts() {
                       </div>
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-start justify-end gap-2 p-2 opacity-0 group-hover:opacity-100">
                         <button
-                          onClick={() => setCroppingImage({ id: img.id, url: img.url, index: idx })}
+                          onClick={() => setCroppingImage({ id: img.id, url: img.url, sort_order: img.sort_order, index: idx })}
                           className="bg-blue-600/90 hover:bg-blue-600 text-white rounded p-1.5 shadow-sm"
                           title="Crop image"
                         >
@@ -709,10 +735,13 @@ export function AdminProducts() {
       )}
 
       {croppingImage && (
-        <ImageCropperModal
+        <FrameCropperModal
           imageUrl={croppingImage.url}
           title="Crop Product Image"
-          description="Drag the box to select the area to keep. No aspect ratio is locked — crop freely."
+          description="Drag and zoom the image to fit the standard product ratio (943:1404)."
+          aspectRatio={PRODUCT_IMAGE_ASPECT_RATIO}
+          outputWidth={PRODUCT_IMAGE_OUTPUT_WIDTH}
+          outputHeight={PRODUCT_IMAGE_OUTPUT_HEIGHT}
           onSave={handleSaveCrop}
           onCancel={() => setCroppingImage(null)}
         />

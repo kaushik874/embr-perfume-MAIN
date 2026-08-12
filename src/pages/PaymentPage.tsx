@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ArrowLeft,
@@ -16,6 +16,12 @@ import { ShopLayout } from "@/components/layout/ShopLayout";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { clearCheckoutShipping, loadCheckoutShipping } from "@/lib/checkout-storage";
+import {
+  loadRazorpayScript,
+  preloadRazorpayScript,
+  type RazorpayFailureResponse,
+  type RazorpayResponse,
+} from "@/lib/razorpay";
 
 const paymentOptions = [
   { id: "upi", label: "UPI", icon: Smartphone, hint: "Google Pay, PhonePe, Paytm" },
@@ -38,6 +44,68 @@ function formatShippingAddress(shipping: NonNullable<ReturnType<typeof loadCheck
     .join(", ");
 }
 
+function paymentMethodConfig(paymentMethod: string) {
+  const method =
+    paymentMethod === "credit" || paymentMethod === "debit"
+      ? "card"
+      : paymentMethod === "wallet"
+        ? "wallet"
+        : paymentMethod === "netbanking"
+          ? "netbanking"
+          : "upi";
+
+  return {
+    display: {
+      blocks: {
+        preferred: {
+          name: "Preferred payment",
+          instruments: [{ method }],
+        },
+      },
+      sequence: ["block.preferred"],
+      preferences: {
+        show_default_blocks: true,
+      },
+    },
+  };
+}
+
+function buildPaymentUrl(
+  path: "order-success" | "payment-failed",
+  orderId: number,
+  checkoutSessionId?: string,
+  razorpayOrderId?: string,
+) {
+  const params = new URLSearchParams();
+  if (checkoutSessionId) params.set("checkoutSessionId", checkoutSessionId);
+  if (razorpayOrderId) params.set("razorpayOrderId", razorpayOrderId);
+  const query = params.toString();
+  return `/${path}/${orderId}${query ? `?${query}` : ""}`;
+}
+
+async function waitForPaidStatus(orderId: number, checkoutSessionId?: string, razorpayOrderId?: string) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const status = await api.paymentStatus(orderId, { checkoutSessionId, razorpayOrderId });
+    if (status.paid) return status;
+    await new Promise((resolve) => window.setTimeout(resolve, 3000));
+  }
+
+  return api.paymentStatus(orderId, { checkoutSessionId, razorpayOrderId });
+}
+
+function failureInfo(response: RazorpayFailureResponse) {
+  const error = response.error;
+  return {
+    code: error?.code ?? null,
+    description: error?.description ?? null,
+    reason: error?.reason ?? null,
+    source: error?.source ?? null,
+    step: error?.step ?? null,
+    paymentId: error?.metadata?.payment_id ?? null,
+    razorpayOrderId: error?.metadata?.order_id ?? null,
+  };
+}
+
 export function PaymentPage() {
   const { refresh } = useAuth();
   const { items, total, clear, syncProducts } = useCart();
@@ -47,6 +115,8 @@ export function PaymentPage() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("upi");
   const [checkoutData, setCheckoutData] = useState(() => loadCheckoutShipping());
+  const openingRef = useRef(false);
+  const paymentResolvedRef = useRef(false);
 
   const orderItems = useMemo(
     () => items.map((i) => ({ slug: i.product.slug, quantity: i.quantity })),
@@ -56,6 +126,10 @@ export function PaymentPage() {
   useEffect(() => {
     void syncProducts();
   }, [syncProducts]);
+
+  useEffect(() => {
+    preloadRazorpayScript();
+  }, []);
 
   useEffect(() => {
     if (paymentSuccess) return;
@@ -72,16 +146,20 @@ export function PaymentPage() {
   }, [items.length, setLocation, paymentSuccess]);
 
   const payNow = async () => {
-    if (!checkoutData || items.length === 0) return;
+    if (!checkoutData || items.length === 0 || openingRef.current) return;
 
-    const { shipping, selectedAddressId, saveAddress, setDefault, updateAddress } = checkoutData;
+    const { checkoutSessionId, shipping, selectedAddressId, saveAddress, setDefault, updateAddress } = checkoutData;
 
+    openingRef.current = true;
+    paymentResolvedRef.current = false;
     setBusy(true);
-    setPaymentMessage(null);
+    setPaymentMessage("Opening secure payment...");
 
     try {
+      const razorpayReady = loadRazorpayScript();
       const result = await api.guestCheckout({
         items: orderItems,
+        checkoutSessionId,
         shipping: {
           name: shipping.name,
           email: shipping.email,
@@ -102,25 +180,34 @@ export function PaymentPage() {
         },
       });
 
-      await refresh();
+      void refresh();
 
-      if (result.mode === "demo") {
+      if (result.mode === "demo" || result.mode === "paid") {
         setPaymentSuccess(true);
         clear();
         clearCheckoutShipping();
-        setPaymentMessage("Order placed successfully in Demo Mode. Add Razorpay keys for live payments.");
+        setLocation(buildPaymentUrl("order-success", result.orderId, result.checkoutSessionId ?? checkoutSessionId, result.razorpayOrderId));
+        openingRef.current = false;
         setBusy(false);
         return;
       }
 
-      const RazorpayCtor = (window as Window & { Razorpay?: new (o: object) => { open: () => void; on: (e: string, h: () => void) => void } }).Razorpay;
-      if (!RazorpayCtor) {
-        setPaymentMessage("Payment failed because Razorpay did not load. Try again.");
+      await razorpayReady;
+
+      const RazorpayCtor = window.Razorpay;
+      if (!RazorpayCtor || !result.keyId || !result.razorpayOrderId) {
+        setPaymentMessage("Payment could not be opened. Please retry.");
+        openingRef.current = false;
         setBusy(false);
         return;
       }
 
       const orderId = result.orderId;
+      const razorpayOrderId = result.razorpayOrderId;
+      const paymentUrlParams = {
+        checkoutSessionId: result.checkoutSessionId ?? checkoutSessionId,
+        razorpayOrderId,
+      };
       const options = {
         key: result.keyId,
         amount: result.amount ?? total * 100,
@@ -134,35 +221,89 @@ export function PaymentPage() {
           contact: shipping.phone,
         },
         theme: { color: "#b08a4a" },
-        handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
+        retry: { enabled: true },
+        config: paymentMethodConfig(paymentMethod),
+        modal: {
+          ondismiss: async function () {
+            if (paymentResolvedRef.current) return;
+            await api.paymentFailed({
+              orderId,
+              razorpay_order_id: razorpayOrderId,
+              checkoutSessionId: paymentUrlParams.checkoutSessionId,
+              code: "checkout_dismissed",
+              description: "Customer closed Razorpay Checkout before completion.",
+            }).catch(() => {});
+            setLocation(buildPaymentUrl("payment-failed", orderId, paymentUrlParams.checkoutSessionId, razorpayOrderId));
+            openingRef.current = false;
+            setBusy(false);
+          },
+        },
+        handler: async function (response: RazorpayResponse) {
+          paymentResolvedRef.current = true;
+          setPaymentMessage("Verifying payment...");
           try {
-            await api.verifyPayment({
+            const verified = await api.verifyPayment({
               orderId,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
             });
-            setPaymentSuccess(true);
-            clear();
-            clearCheckoutShipping();
-            setPaymentMessage("Payment successful. Thank you for your order.");
+
+            const finalStatus = verified.paid
+              ? { paid: true }
+              : await waitForPaidStatus(orderId, paymentUrlParams.checkoutSessionId, response.razorpay_order_id);
+
+            if (finalStatus.paid) {
+              setPaymentSuccess(true);
+              clear();
+              clearCheckoutShipping();
+              setLocation(buildPaymentUrl("order-success", orderId, paymentUrlParams.checkoutSessionId, response.razorpay_order_id));
+              return;
+            }
+
+            setPaymentMessage("Payment is being confirmed by Razorpay. Please check your orders in a moment.");
           } catch {
-            setPaymentSuccess(true);
-            clearCheckoutShipping();
-            setPaymentMessage("Payment received. Contact support if the order stays pending.");
+            try {
+              const status = await waitForPaidStatus(orderId, paymentUrlParams.checkoutSessionId, response.razorpay_order_id);
+              if (status.paid) {
+                setPaymentSuccess(true);
+                clear();
+                clearCheckoutShipping();
+                setLocation(buildPaymentUrl("order-success", orderId, paymentUrlParams.checkoutSessionId, response.razorpay_order_id));
+                return;
+              }
+            } catch {}
+            setPaymentMessage("Payment received by Razorpay. We are verifying it securely. Please check your orders shortly.");
+          } finally {
+            openingRef.current = false;
+            setBusy(false);
           }
-          setBusy(false);
         },
       };
 
       const rzp = new RazorpayCtor(options);
-      rzp.on("payment.failed", function () {
-        setPaymentMessage("Payment failed. Try again.");
+      rzp.on("payment.failed", async function (response) {
+        paymentResolvedRef.current = true;
+        const info = failureInfo(response as RazorpayFailureResponse);
+        await api.paymentFailed({
+          orderId,
+          razorpay_order_id: info.razorpayOrderId ?? razorpayOrderId,
+          checkoutSessionId: paymentUrlParams.checkoutSessionId,
+          code: info.code,
+          description: info.description,
+          reason: info.reason,
+          source: info.source,
+          step: info.step,
+          paymentId: info.paymentId,
+        }).catch(() => {});
+        setLocation(buildPaymentUrl("payment-failed", orderId, paymentUrlParams.checkoutSessionId, info.razorpayOrderId ?? razorpayOrderId));
+        openingRef.current = false;
         setBusy(false);
       });
       rzp.open();
     } catch (err) {
       setPaymentMessage(err instanceof Error ? err.message : "Checkout failed. Try again.");
+      openingRef.current = false;
       setBusy(false);
     }
   };

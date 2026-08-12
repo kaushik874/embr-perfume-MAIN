@@ -265,6 +265,7 @@ export const api = {
 
   guestCheckout: (body: {
     items: { slug: string; quantity: number }[];
+    checkoutSessionId?: string;
     shipping: {
       name: string;
       email: string;
@@ -285,7 +286,7 @@ export const api = {
     };
   }) =>
     request<{
-      mode: "demo" | "razorpay";
+      mode: "demo" | "razorpay" | "paid";
       orderId: number;
       user: User;
       message?: string;
@@ -293,6 +294,7 @@ export const api = {
       amount?: number;
       currency?: string;
       keyId?: string;
+      checkoutSessionId?: string;
     }>("/orders/guest-checkout", {
       method: "POST",
       body: JSON.stringify(body),
@@ -310,10 +312,43 @@ export const api = {
     razorpay_payment_id: string;
     razorpay_signature: string;
   }) =>
-    request<{ ok: boolean; orderId: number }>("/orders/verify", {
+    request<{ ok: boolean; paid?: boolean; orderId: number; razorpayPaymentId?: string; amount?: number; message?: string }>("/orders/verify", {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  paymentFailed: (body: {
+    orderId: number;
+    razorpay_order_id: string;
+    checkoutSessionId?: string;
+    code?: string | null;
+    description?: string | null;
+    reason?: string | null;
+    source?: string | null;
+    step?: string | null;
+    paymentId?: string | null;
+  }) =>
+    request<{ ok: boolean }>("/orders/payment-failed", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  paymentStatus: (orderId: number, query?: { checkoutSessionId?: string; razorpayOrderId?: string }) => {
+    const params = new URLSearchParams();
+    if (query?.checkoutSessionId) params.set("checkoutSessionId", query.checkoutSessionId);
+    if (query?.razorpayOrderId) params.set("razorpayOrderId", query.razorpayOrderId);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request<{
+      orderId: number;
+      status: string;
+      paid: boolean;
+      amount: number;
+      razorpayOrderId: string | null;
+      razorpayPaymentId: string | null;
+      failureCode: string | null;
+      failureReason: string | null;
+    }>(`/orders/${orderId}/payment-status${suffix}`);
+  },
 };
 
 export const adminApi = {

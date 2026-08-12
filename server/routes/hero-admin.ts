@@ -110,7 +110,9 @@ router.post("/hero/upload", (req, res) => {
 
 router.post("/hero", async (req, res) => {
   const values = bannerValues(req.body ?? {});
-  if (!values.imageUrl) return res.status(400).json({ error: "Banner image is required" });
+  if (!values.imageUrl && !values.mobileImageUrl) {
+    return res.status(400).json({ error: "Desktop or mobile banner image is required" });
+  }
 
   const stmt = db.prepare(`
     INSERT INTO hero_banners (title, subtitle, description, imageUrl, mobileImageUrl, productName, productUrl, badge, buttonText, buttonLink, showButton, darkOverlay, imageFit, imagePosition, mobileImagePosition, showText, isActive, displayOrder)
@@ -147,7 +149,9 @@ router.put("/hero/:id", async (req, res) => {
   if (!existing) return res.status(404).json({ error: "Banner not found" });
 
   const values = bannerValues(req.body ?? {}, existing);
-  if (!values.imageUrl) return res.status(400).json({ error: "Banner image is required" });
+  if (!values.imageUrl && !values.mobileImageUrl) {
+    return res.status(400).json({ error: "Desktop or mobile banner image is required" });
+  }
 
   const stmt = db.prepare(`
     UPDATE hero_banners SET 

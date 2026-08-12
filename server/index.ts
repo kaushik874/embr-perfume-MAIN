@@ -50,6 +50,7 @@ import analyticsTrackRoutes from "./routes/analytics-track.js";
 import analyticsAdminRoutes from "./routes/analytics-admin.js";
 import { startAutomaticBackups } from "./lib/backups.js";
 import { startOrderExpiryJob } from "./lib/orders.js";
+import { startRazorpayPaymentSyncJob } from "./lib/payments.js";
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
@@ -184,6 +185,7 @@ async function startServer() {
   await initDb();
   await runMigrations();
   startAutomaticBackups();
+  startRazorpayPaymentSyncJob();
   startOrderExpiryJob();
 
   app.listen(port, () => {

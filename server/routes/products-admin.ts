@@ -61,6 +61,29 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+function numberValue(value: unknown, fallback: number | null = null) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function saveProductImageFile(img: { name: string; type: string; data: string }, prefix = "") {
+  if (!ALLOWED_TYPES.includes(img.type)) return null;
+
+  const ext = path.extname(img.name).toLowerCase();
+  if (!ALLOWED_EXTENSIONS.includes(ext)) return null;
+
+  const buffer = Buffer.from(img.data, "base64");
+  if (buffer.length > MAX_FILE_SIZE) return null;
+  if (!hasImageSignature(buffer, img.type)) return null;
+
+  const filename = `${crypto.randomUUID()}-${prefix}${sanitizeFilename(img.name)}`;
+  const filepath = path.join(UPLOAD_DIR, filename);
+  if (!path.resolve(filepath).startsWith(path.resolve(UPLOAD_DIR))) return null;
+
+  fs.writeFileSync(filepath, buffer);
+  return `/uploads/products/${filename}`;
+}
+
 router.get("/products", async (req, res) => {
   const search = (req.query.search as string) || "";
   const category = (req.query.category as string) || "";
@@ -246,36 +269,30 @@ router.post("/products/:id/images", async (req, res) => {
         continue;
       }
 
-      if (!ALLOWED_TYPES.includes(img.type)) {
-        continue;
-      }
+      const url = saveProductImageFile({ name: img.name, type: img.type, data: img.data });
+      if (!url) continue;
 
-      const ext = path.extname(img.name).toLowerCase();
-      if (!ALLOWED_EXTENSIONS.includes(ext)) {
-        continue;
-      }
-
-      const buffer = Buffer.from(img.data, "base64");
-      if (buffer.length > MAX_FILE_SIZE) {
-        continue;
-      }
-      if (!hasImageSignature(buffer, img.type)) {
-        continue;
-      }
-
-      const filename = `${crypto.randomUUID()}-${sanitizeFilename(img.name)}`;
-      const filepath = path.join(UPLOAD_DIR, filename);
-      if (!path.resolve(filepath).startsWith(path.resolve(UPLOAD_DIR))) {
-        continue;
-      }
-      fs.writeFileSync(filepath, buffer);
-
-      const url = `/uploads/products/${filename}`;
+      const originalUrl =
+        img.originalData && img.originalName && img.originalType
+          ? saveProductImageFile(
+              { name: img.originalName, type: img.originalType, data: img.originalData },
+              "original-",
+            )
+          : null;
+      const crop = img.crop && typeof img.crop === "object" ? img.crop : {};
       savedUrls.push(url);
 
       await db.prepare(
-        "INSERT INTO product_images (product_id, url, sort_order) VALUES (?, ?, ?)"
-      ).run(req.params.id, url, maxSort + 1 + i);
+        "INSERT INTO product_images (product_id, url, original_url, crop_x, crop_y, crop_zoom, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        req.params.id,
+        url,
+        originalUrl,
+        numberValue(crop.x),
+        numberValue(crop.y),
+        numberValue(crop.zoom),
+        maxSort + 1 + i,
+      );
     }
 
     if (savedUrls.length === 0) {
@@ -306,8 +323,8 @@ function hasImageSignature(buffer: Buffer, mimeType: string) {
 }
 
 router.delete("/products/:id/images/:imageId", async (req, res) => {
-  const image = await db.prepare("SELECT url FROM product_images WHERE id = ? AND product_id = ?")
-    .get(req.params.imageId, req.params.id) as { url: string } | undefined;
+  const image = await db.prepare("SELECT url, original_url FROM product_images WHERE id = ? AND product_id = ?")
+    .get(req.params.imageId, req.params.id) as { url: string; original_url?: string | null } | undefined;
 
   if (!image) {
     res.status(404).json({ error: "Image not found" });
@@ -319,11 +336,56 @@ router.delete("/products/:id/images/:imageId", async (req, res) => {
     fs.unlinkSync(filepath);
   }
 
+  if (image.original_url && image.original_url !== image.url) {
+    const originalPath = publicFilePath(image.original_url);
+    if (fs.existsSync(originalPath)) {
+      fs.unlinkSync(originalPath);
+    }
+  }
+
   await db.prepare("DELETE FROM product_images WHERE id = ?").run(req.params.imageId);
 
   await syncPrimaryProductImage(req.params.id);
 
   res.json({ ok: true });
+});
+
+router.patch("/products/:id/images/:imageId/crop", async (req, res) => {
+  const existing = await db.prepare("SELECT id, original_url FROM product_images WHERE id = ? AND product_id = ?")
+    .get(req.params.imageId, req.params.id) as { id: number; original_url?: string | null } | undefined;
+
+  if (!existing) {
+    res.status(404).json({ error: "Image not found" });
+    return;
+  }
+
+  const image = req.body?.image;
+  if (!image?.name || !image?.type || !image?.data) {
+    res.status(400).json({ error: "Cropped image is required" });
+    return;
+  }
+
+  const url = saveProductImageFile({ name: image.name, type: image.type, data: image.data }, "crop-");
+  if (!url) {
+    res.status(400).json({ error: "No valid cropped image was saved" });
+    return;
+  }
+
+  const crop = req.body?.crop && typeof req.body.crop === "object" ? req.body.crop : {};
+  await db.prepare(
+    "UPDATE product_images SET url = ?, crop_x = ?, crop_y = ?, crop_zoom = ? WHERE id = ? AND product_id = ?"
+  ).run(
+    url,
+    numberValue(crop.x),
+    numberValue(crop.y),
+    numberValue(crop.zoom),
+    req.params.imageId,
+    req.params.id,
+  );
+
+  await syncPrimaryProductImage(req.params.id);
+  logAdminAction(req.user!.userId, "recrop_image", `Recropped image #${req.params.imageId} for product #${req.params.id}`);
+  res.json({ url });
 });
 
 router.patch("/products/:id/images/order", async (req, res) => {

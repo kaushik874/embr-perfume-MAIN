@@ -10,6 +10,7 @@
     "build": "vite build && tsc -p tsconfig.server.json && node scripts/copy-uploads.js",
     "start": "node dist/server/index.js",
     "migrate": "node scripts/migrate-sqlite-to-pg.js",
+    "payments:reconcile": "tsx scripts/reconcile-razorpay-orders.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit"
   },
   "dependencies": {

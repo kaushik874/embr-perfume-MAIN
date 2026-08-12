@@ -162,8 +162,8 @@ export function AdminHero() {
     if (!banner) return false;
 
     const payload = toPayload(banner, index);
-    if (!payload.imageUrl) {
-      toast.error(`Banner #${index + 1} needs an image before saving`);
+    if (!payload.imageUrl && !payload.mobileImageUrl) {
+      toast.error(`Banner #${index + 1} needs a desktop or mobile image before saving`);
       return false;
     }
 
@@ -204,8 +204,8 @@ export function AdminHero() {
       for (let i = 0; i < next.length; i += 1) {
         const banner = next[i];
         const payload = toPayload(banner, i);
-        if (!payload.imageUrl) {
-          toast.error(`Banner #${i + 1} needs an image before saving`);
+        if (!payload.imageUrl && !payload.mobileImageUrl) {
+          toast.error(`Banner #${i + 1} needs a desktop or mobile image before saving`);
           return;
         }
 
@@ -282,7 +282,7 @@ export function AdminHero() {
       const data = await readFileAsDataUrl(file);
       const res = await adminApi.uploadHeroBannerImage({ name: file.name, data });
       await publishUploadedImage(banner, index, field, res.url);
-      toast.success("Image uploaded and published in the hero slider");
+      toast.success(`${field === "imageUrl" ? "Desktop" : "Mobile"} hero image uploaded and published`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to upload image");
     } finally {
@@ -462,13 +462,13 @@ export function AdminHero() {
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Banner Image</Label>
+                    <Label>Desktop / PC Hero Image</Label>
                     <div className="relative aspect-[16/7] overflow-hidden border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-900">
                       {banner.imageUrl ? (
                         <img src={banner.imageUrl} alt="Hero banner preview" className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full items-center justify-center text-sm text-gray-500">
-                          Upload an image or paste an image URL
+                          Upload a desktop image or paste an image URL
                         </div>
                       )}
                       {uploading === banner.id && (
@@ -487,7 +487,7 @@ export function AdminHero() {
                       />
                       <label className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border bg-white px-4 py-2 text-sm font-medium shadow-xs dark:bg-gray-950">
                         <Upload className="h-4 w-4" />
-                        Upload Image
+                        Upload Desktop Image
                         <input
                           type="file"
                           accept="image/*"
@@ -497,7 +497,48 @@ export function AdminHero() {
                         />
                       </label>
                     </div>
-                    
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Mobile Hero Image</Label>
+                    <div className="relative aspect-[3/4] max-w-xs overflow-hidden border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-900">
+                      {banner.mobileImageUrl ? (
+                        <img src={banner.mobileImageUrl} alt="Mobile hero preview" className="h-full w-full object-cover" />
+                      ) : banner.imageUrl ? (
+                        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-gray-500">
+                          Mobile will use desktop image until a mobile image is uploaded.
+                        </div>
+                      ) : (
+                        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-gray-500">
+                          Upload a mobile image or paste an image URL
+                        </div>
+                      )}
+                      {uploading === banner.id && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-sm font-medium text-white">
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Uploading...
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,0.7fr)]">
+                      <Input
+                        placeholder="/uploads/hero/mobile-banner.webp"
+                        value={banner.mobileImageUrl ?? ""}
+                        onChange={(event) => updateField(index, "mobileImageUrl", event.target.value)}
+                        disabled={isBusy}
+                      />
+                      <label className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border bg-white px-4 py-2 text-sm font-medium shadow-xs dark:bg-gray-950">
+                        <Upload className="h-4 w-4" />
+                        Upload Mobile Image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(event) => handleUploadImage(event, index, "mobileImageUrl")}
+                          disabled={isBusy}
+                        />
+                      </label>
+                    </div>
 
                   </div>
 
@@ -573,7 +614,22 @@ export function AdminHero() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Mobile Version Crop</Label>
+                      <Label>Mobile Crop Position</Label>
+                      <select
+                        value={banner.mobileImagePosition || "center center"}
+                        onChange={(event) => updateField(index, "mobileImagePosition", event.target.value)}
+                        className="min-h-9 w-full rounded-md border bg-white px-3 text-sm dark:bg-gray-950"
+                        disabled={isBusy}
+                      >
+                        <option value="center center">Center</option>
+                        <option value="left center">Left</option>
+                        <option value="right center">Right</option>
+                        <option value="center top">Top</option>
+                        <option value="center bottom">Bottom</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Optional Mobile Recrop</Label>
                       <div className="flex gap-2 items-center">
                          {banner.mobileImageUrl && (
                            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border">
@@ -592,7 +648,7 @@ export function AdminHero() {
                          </Button>
                       </div>
                       <p className="text-[10px] text-gray-500">
-                        Select a specific area of the main image to show perfectly on mobile devices.
+                        Use this only when you want to make a mobile image from the desktop image.
                       </p>
                     </div>
                   </div>

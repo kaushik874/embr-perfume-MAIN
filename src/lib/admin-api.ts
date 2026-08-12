@@ -78,7 +78,20 @@ export const adminApi = {
   updateProduct: (id: number, body: any) => request<{ ok: boolean }>(`/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteProduct: (id: number) => request<{ ok: boolean }>(`/products/${id}`, { method: "DELETE" }),
   updateStock: (id: number, stock: number) => request<{ ok: boolean }>(`/products/${id}/stock`, { method: "PATCH", body: JSON.stringify({ stock }) }),
-  uploadImages: (id: number, images: { name: string; type: string; data: string }[]) => request<{ images: string[] }>(`/products/${id}/images`, { method: "POST", body: JSON.stringify({ images }) }),
+  uploadImages: (id: number, images: {
+    name: string;
+    type: string;
+    data: string;
+    originalName?: string;
+    originalType?: string;
+    originalData?: string;
+    crop?: { x: number; y: number; zoom: number };
+  }[]) => request<{ images: string[] }>(`/products/${id}/images`, { method: "POST", body: JSON.stringify({ images }) }),
+  recropImage: (
+    productId: number,
+    imageId: number,
+    body: { image: { name: string; type: string; data: string }; crop: { x: number; y: number; zoom: number } },
+  ) => request<{ url: string }>(`/products/${productId}/images/${imageId}/crop`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteImage: (productId: number, imageId: number) => request<{ ok: boolean }>(`/products/${productId}/images/${imageId}`, { method: "DELETE" }),
   reorderImages: (id: number, imageIds: number[]) =>
     request<{ ok: boolean }>(`/products/${id}/images/order`, {

@@ -48,6 +48,15 @@ export function Hero() {
     "--hero-mobile-position": banner.mobileImagePosition || banner.imagePosition || "center center",
   }) as CSSProperties & Record<string, string>;
 
+  const heroSources = (banner: HeroBanner) => {
+    const desktop = (banner.imageUrl || "").trim();
+    const mobile = (banner.mobileImageUrl || "").trim();
+    return {
+      desktopSrc: desktop || mobile,
+      mobileSrc: mobile || desktop,
+    };
+  };
+
   return (
     <>
       <Header variant="light" />
@@ -62,16 +71,24 @@ export function Hero() {
               i === current ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
-            <picture>
-              <source media="(max-width: 639px)" srcSet={b.mobileImageUrl || b.imageUrl} />
-              <img
-                src={b.imageUrl}
-                alt={b.title || "Hero Banner"}
-                fetchPriority={i === 0 ? "high" : "auto"}
-                style={imageStyle(b)}
-                className="h-full w-full object-cover [object-position:var(--hero-mobile-position)] md:[object-position:var(--hero-desktop-position)]"
-              />
-            </picture>
+            {(() => {
+              const { desktopSrc, mobileSrc } = heroSources(b);
+              if (!desktopSrc && !mobileSrc) return null;
+
+              return (
+                <picture>
+                  {mobileSrc && mobileSrc !== desktopSrc ? <source media="(max-width: 639px)" srcSet={mobileSrc} /> : null}
+                  {desktopSrc && desktopSrc !== mobileSrc ? <source media="(min-width: 640px)" srcSet={desktopSrc} /> : null}
+                  <img
+                    src={mobileSrc || desktopSrc}
+                    alt={b.title || "Hero Banner"}
+                    fetchPriority={i === 0 ? "high" : "auto"}
+                    style={imageStyle(b)}
+                    className="h-full w-full object-cover [object-position:var(--hero-mobile-position)] sm:[object-position:var(--hero-desktop-position)]"
+                  />
+                </picture>
+              );
+            })()}
             {b.darkOverlay === 1 && (
               <div className="absolute inset-0 bg-black/25 sm:bg-gradient-to-r sm:from-black/55 sm:via-black/20 sm:to-transparent" />
             )}

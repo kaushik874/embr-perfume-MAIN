@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { formatAddress, type CheckoutAddressInput } from "./addresses.js";
+import { razorpayEnabled, reconcilePendingRazorpayOrders } from "./payments.js";
 
 export type LineItemInput = { productId?: number; slug?: string; quantity: number };
 
@@ -59,17 +60,18 @@ export async function createOrderRecord(
     pricePaise: number;
   }[],
   shipping?: CheckoutAddressInput & { addressId?: number },
+  checkoutSessionId?: string,
 ) {
   const insertOrder = db.prepare(`
     INSERT INTO orders (
-      user_id, status, total_paise,
+      user_id, status, total_paise, checkout_session_id,
       shipping_name, shipping_email, shipping_phone,
       shipping_address, shipping_city, shipping_pincode,
       shipping_state, shipping_house_number, shipping_street, shipping_area,
       shipping_landmark, shipping_alternate_phone, shipping_company_name,
       shipping_address_id
     )
-    VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertItem = db.prepare(`
@@ -85,6 +87,7 @@ export async function createOrderRecord(
     const result = await insertOrder.run(
       userId,
       totalPaise,
+      checkoutSessionId ?? null,
       shipping?.name ?? null,
       shipping?.email ?? null,
       shipping?.phone ?? null,
@@ -118,10 +121,14 @@ export async function createOrderRecord(
 
 export function startOrderExpiryJob() {
   const intervalMs = 15 * 60 * 1000; // Check every 15 minutes
-  const expiryMinutes = 30; // Expire after 30 minutes
+  const expiryMinutes = Math.max(60, Number(process.env.PENDING_ORDER_EXPIRY_MINUTES ?? 24 * 60));
 
   const timer = setInterval(async () => {
     try {
+      if (razorpayEnabled()) {
+        await reconcilePendingRazorpayOrders({ limit: 100 });
+      }
+
       const expiredOrders = await db.prepare(`
         SELECT id FROM orders 
         WHERE status = 'pending' 

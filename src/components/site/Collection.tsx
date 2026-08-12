@@ -17,7 +17,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
       style={{ transitionDelay: `${index * 80}ms` }}
     >
       <Link href={`/product/${product.slug}`} className="block flex-1">
-        <div className="relative mb-2 flex aspect-square w-full items-center justify-center overflow-hidden rounded-md bg-[#f5f5f5] md:mb-6 md:rounded-lg md:bg-forest-deep/5">
+        <div className="relative mb-2 flex aspect-[943/1404] md:aspect-square w-full items-center justify-center overflow-hidden rounded-md bg-[#f5f5f5] md:mb-6 md:rounded-lg md:bg-forest-deep/5">
           {product.bestseller ? (
             <span className="absolute left-1.5 top-1.5 z-10 rounded bg-[#1a3a6b] px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-white">
               BESTSELLER
