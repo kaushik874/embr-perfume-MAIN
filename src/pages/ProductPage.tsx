@@ -466,7 +466,7 @@ function RelatedProducts({ relatedProducts }: SectionRenderContext) {
             href={`/product/${product.slug}`}
             className="group block border border-border-light bg-white p-2 transition-colors hover:border-ink"
           >
-            <div className="aspect-[943/1404] md:aspect-square overflow-hidden bg-[#f7f7f5]">
+            <div className="aspect-square overflow-hidden bg-[#f7f7f5]">
               <img
                 src={product.image ?? "/images/bottle-mini.svg"}
                 alt={product.name}

@@ -58,6 +58,10 @@ export type ProductFull = {
   heart_notes: string | null;
   base_notes: string | null;
   review: string | null;
+  display_image_original_url?: string | null;
+  display_crop_x?: number | null;
+  display_crop_y?: number | null;
+  display_crop_zoom?: number | null;
 };
 
 export type Pagination = {
@@ -93,6 +97,10 @@ export const adminApi = {
     body: { image: { name: string; type: string; data: string }; crop: { x: number; y: number; zoom: number } },
   ) => request<{ url: string }>(`/products/${productId}/images/${imageId}/crop`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteImage: (productId: number, imageId: number) => request<{ ok: boolean }>(`/products/${productId}/images/${imageId}`, { method: "DELETE" }),
+  updateDisplayCrop: (id: number, body: { image: { name: string; type: string; data: string }; original_url: string; crop: { x: number; y: number; zoom: number } }) =>
+    request<{ url: string }>(`/products/${id}/display-crop`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteDisplayCrop: (id: number) =>
+    request<{ ok: boolean }>(`/products/${id}/display-crop`, { method: "DELETE" }),
   reorderImages: (id: number, imageIds: number[]) =>
     request<{ ok: boolean }>(`/products/${id}/images/order`, {
       method: "PATCH",

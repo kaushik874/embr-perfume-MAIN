@@ -69,6 +69,10 @@ export type Product = {
   heart_notes?: string | null;
   base_notes?: string | null;
   review?: string | null;
+  display_image_original_url?: string | null;
+  display_crop_x?: number | null;
+  display_crop_y?: number | null;
+  display_crop_zoom?: number | null;
 };
 
 export type HeroBanner = {

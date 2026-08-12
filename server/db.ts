@@ -270,7 +270,11 @@ CREATE TABLE IF NOT EXISTS products (
   head_notes TEXT,
   heart_notes TEXT,
   base_notes TEXT,
-  review TEXT
+  review TEXT,
+  display_image_original_url TEXT,
+  display_crop_x REAL,
+  display_crop_y REAL,
+  display_crop_zoom REAL
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -576,6 +580,22 @@ export async function initDb(options: { seedDefaults?: boolean } = {}) {
 
   try {
     await db.exec("ALTER TABLE product_images ADD COLUMN IF NOT EXISTS crop_zoom REAL");
+  } catch (e) {}
+
+  try {
+    await db.exec("ALTER TABLE products ADD COLUMN IF NOT EXISTS display_image_original_url TEXT");
+  } catch (e) {}
+
+  try {
+    await db.exec("ALTER TABLE products ADD COLUMN IF NOT EXISTS display_crop_x REAL");
+  } catch (e) {}
+
+  try {
+    await db.exec("ALTER TABLE products ADD COLUMN IF NOT EXISTS display_crop_y REAL");
+  } catch (e) {}
+
+  try {
+    await db.exec("ALTER TABLE products ADD COLUMN IF NOT EXISTS display_crop_zoom REAL");
   } catch (e) {}
   
   try {

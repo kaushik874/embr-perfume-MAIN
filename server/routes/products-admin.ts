@@ -13,6 +13,11 @@ function publicFilePath(url: string) {
 }
 
 async function syncPrimaryProductImage(productId: string | number) {
+  const product = await db.prepare("SELECT display_image_original_url FROM products WHERE id = ?").get(productId) as { display_image_original_url?: string | null } | undefined;
+  if (product?.display_image_original_url) {
+    return;
+  }
+
   const firstImage = await db.prepare(
     "SELECT url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC LIMIT 1"
   ).get(productId) as { url: string } | undefined;
@@ -386,6 +391,57 @@ router.patch("/products/:id/images/:imageId/crop", async (req, res) => {
   await syncPrimaryProductImage(req.params.id);
   logAdminAction(req.user!.userId, "recrop_image", `Recropped image #${req.params.imageId} for product #${req.params.id}`);
   res.json({ url });
+});
+
+router.patch("/products/:id/display-crop", async (req, res) => {
+  const product = await db.prepare("SELECT id FROM products WHERE id = ?").get(req.params.id);
+  if (!product) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  const image = req.body?.image;
+  if (!image?.name || !image?.type || !image?.data) {
+    res.status(400).json({ error: "Cropped image is required" });
+    return;
+  }
+
+  const originalUrl = req.body?.original_url;
+  if (!originalUrl || typeof originalUrl !== "string") {
+    res.status(400).json({ error: "Original image URL is required" });
+    return;
+  }
+
+  const url = saveProductImageFile({ name: image.name, type: image.type, data: image.data }, "display-crop-");
+  if (!url) {
+    res.status(400).json({ error: "No valid cropped image was saved" });
+    return;
+  }
+
+  const crop = req.body?.crop && typeof req.body.crop === "object" ? req.body.crop : {};
+  await db.prepare(
+    "UPDATE products SET image = ?, display_image_original_url = ?, display_crop_x = ?, display_crop_y = ?, display_crop_zoom = ? WHERE id = ?"
+  ).run(
+    url,
+    originalUrl,
+    numberValue(crop.x),
+    numberValue(crop.y),
+    numberValue(crop.zoom),
+    req.params.id,
+  );
+
+  logAdminAction(req.user!.userId, "display_crop_image", `Set custom display crop for product #${req.params.id}`);
+  res.json({ url });
+});
+
+router.delete("/products/:id/display-crop", async (req, res) => {
+  await db.prepare(
+    "UPDATE products SET display_image_original_url = NULL, display_crop_x = NULL, display_crop_y = NULL, display_crop_zoom = NULL WHERE id = ?"
+  ).run(req.params.id);
+
+  await syncPrimaryProductImage(req.params.id);
+  logAdminAction(req.user!.userId, "clear_display_crop", `Cleared custom display crop for product #${req.params.id}`);
+  res.json({ ok: true });
 });
 
 router.patch("/products/:id/images/order", async (req, res) => {
