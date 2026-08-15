@@ -1,34 +1,74 @@
 import { Router } from "express";
-import { db } from "../db.js";
+import { z } from "zod";
+import {
+  calculateOrderPricing,
+  validateCoupon,
+  calculateCouponDiscount,
+} from "../lib/pricing.js";
+import { verifyToken } from "../middleware/auth.js";
 
 const router = Router();
 
+const validateSchema = z.object({
+  code: z.string().min(1),
+  items: z.array(
+    z.object({
+      slug: z.string().min(1).optional(),
+      productId: z.number().int().positive().optional(),
+      quantity: z.number().int().min(1).max(10),
+    }).refine((item) => item.productId || item.slug, {
+      message: "Each item needs productId or slug",
+    })
+  ).min(1),
+});
+
 // Public endpoint – no auth required so checkout can validate coupons
+// Optionally reads the auth cookie to check per-customer limits
 router.post("/validate", async (req, res) => {
-  const { code, orderTotalPaise } = req.body;
-  if (!code) { res.status(400).json({ error: "Coupon code required" }); return; }
-
-  const coupon = await db.prepare(
-    "SELECT * FROM coupons WHERE code = ? AND status = 'active'"
-  ).get(String(code).toUpperCase()) as any;
-
-  if (!coupon) { res.status(404).json({ error: "Invalid or expired coupon code" }); return; }
-
-  if (coupon.expiry_date && new Date(coupon.expiry_date) < new Date()) {
-    res.status(400).json({ error: "Coupon has expired" }); return;
-  }
-  if (coupon.usage_limit && coupon.times_used >= coupon.usage_limit) {
-    res.status(400).json({ error: "Coupon usage limit reached" }); return;
+  const parsed = validateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
   }
 
-  let discountPaise = 0;
-  if (coupon.discount_type === "percent") {
-    discountPaise = Math.floor((Number(orderTotalPaise) || 0) * coupon.discount_value / 100);
-  } else {
-    discountPaise = coupon.discount_value * 100;
+  const { code, items } = parsed.data;
+
+  // Try to extract userId from auth cookie for per-customer limit checks
+  let userId: number | undefined;
+  const token =
+    req.cookies?.embr_token ??
+    (req.headers.authorization?.startsWith("Bearer ")
+      ? req.headers.authorization.slice(7)
+      : null);
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) userId = payload.userId;
   }
 
-  res.json({ ok: true, coupon, discountPaise });
+  try {
+    const pricing = await calculateOrderPricing(items, code, userId);
+    res.json({
+      valid: true,
+      coupon: pricing.coupon
+        ? {
+            code: pricing.coupon.code,
+            discount_type: pricing.coupon.discount_type,
+            discount_value: pricing.coupon.discount_value,
+            min_order_value: pricing.coupon.min_order_value,
+            max_discount: pricing.coupon.max_discount,
+          }
+        : null,
+      subtotalPaise: pricing.subtotalPaise,
+      shippingPaise: pricing.shippingPaise,
+      couponDiscountPaise: pricing.couponDiscountPaise,
+      totalPaise: pricing.totalPaise,
+    });
+  } catch (err) {
+    res.status(400).json({
+      valid: false,
+      error: err instanceof Error ? err.message : "Invalid coupon",
+    });
+  }
 });
 
 export default router;

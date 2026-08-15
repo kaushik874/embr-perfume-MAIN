@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { formatAddress, type CheckoutAddressInput } from "./addresses.js";
 import { razorpayEnabled, reconcilePendingRazorpayOrders } from "./payments.js";
+import { releaseCouponUsage } from "./pricing.js";
 
 export type LineItemInput = { productId?: number; slug?: string; quantity: number };
 
@@ -51,6 +52,15 @@ export async function buildOrderLines(items: LineItemInput[]) {
   return { totalPaise, lineItems };
 }
 
+export type PricingBreakdown = {
+  subtotalPaise?: number;
+  shippingPaise?: number;
+  couponCode?: string | null;
+  couponDiscountType?: string | null;
+  couponDiscountValue?: number | null;
+  couponDiscountPaise?: number;
+};
+
 export async function createOrderRecord(
   userId: number,
   totalPaise: number,
@@ -61,6 +71,7 @@ export async function createOrderRecord(
   }[],
   shipping?: CheckoutAddressInput & { addressId?: number },
   checkoutSessionId?: string,
+  pricing?: PricingBreakdown,
 ) {
   const insertOrder = db.prepare(`
     INSERT INTO orders (
@@ -69,9 +80,11 @@ export async function createOrderRecord(
       shipping_address, shipping_city, shipping_pincode,
       shipping_state, shipping_house_number, shipping_street, shipping_area,
       shipping_landmark, shipping_alternate_phone, shipping_company_name,
-      shipping_address_id
+      shipping_address_id,
+      subtotal_paise, shipping_paise, coupon_code, coupon_discount_type,
+      coupon_discount_value, coupon_discount_paise
     )
-    VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertItem = db.prepare(`
@@ -102,6 +115,12 @@ export async function createOrderRecord(
       shipping?.alternatePhone ?? null,
       shipping?.companyName ?? null,
       shipping?.addressId ?? null,
+      pricing?.subtotalPaise ?? null,
+      pricing?.shippingPaise ?? null,
+      pricing?.couponCode ?? null,
+      pricing?.couponDiscountType ?? null,
+      pricing?.couponDiscountValue ?? null,
+      pricing?.couponDiscountPaise ?? null,
     );
     const orderId = Number(result.lastInsertRowid);
 
@@ -154,6 +173,7 @@ export function startOrderExpiryJob() {
             await restoreStock.run(item.quantity, item.product_id);
           }
           await cancelOrder.run(order.id);
+          await releaseCouponUsage(order.id);
         }
       })();
       console.log(`[Orders] Cancelled ${expiredOrders.length} expired pending orders and restored stock.`);

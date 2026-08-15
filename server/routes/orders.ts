@@ -4,6 +4,7 @@ import { db } from "../db.js";
 import { requireAuth, verifyToken } from "../middleware/auth.js";
 import { setAuthCookie } from "../lib/auth-cookie.js";
 import { buildOrderLines, createOrderRecord } from "../lib/orders.js";
+import { calculateOrderPricing, recordCouponUsage } from "../lib/pricing.js";
 import { ensureUserFromShipping } from "../lib/users.js";
 import { saveCustomerAddress } from "../lib/addresses.js";
 import { sendEmail } from "../lib/email.js";
@@ -57,6 +58,7 @@ const shippingSchema = z.object({
 const guestCheckoutSchema = z.object({
   items: z.array(itemSchema).min(1),
   shipping: shippingSchema,
+  couponCode: z.string().max(50).optional(),
   checkoutSessionId: z
     .string()
     .min(12)
@@ -161,15 +163,33 @@ router.post("/guest-checkout", async (req, res) => {
     return;
   }
 
-  const { items, shipping, checkoutSessionId } = parsed.data;
+  const { items, shipping, checkoutSessionId, couponCode } = parsed.data;
 
   let totalPaise: number;
   let lineItems: Awaited<ReturnType<typeof buildOrderLines>>["lineItems"];
+  let pricingBreakdown: {
+    subtotalPaise: number;
+    shippingPaise: number;
+    couponCode: string | null;
+    couponDiscountType: string | null;
+    couponDiscountValue: number | null;
+    couponDiscountPaise: number;
+    couponId: number | null;
+  } | undefined;
 
   try {
-    const built = await buildOrderLines(items);
-    totalPaise = built.totalPaise;
-    lineItems = built.lineItems;
+    const pricing = await calculateOrderPricing(items, couponCode);
+    totalPaise = pricing.totalPaise;
+    lineItems = pricing.lineItems;
+    pricingBreakdown = {
+      subtotalPaise: pricing.subtotalPaise,
+      shippingPaise: pricing.shippingPaise,
+      couponCode: pricing.couponCode,
+      couponDiscountType: pricing.couponDiscountType,
+      couponDiscountValue: pricing.couponDiscountValue,
+      couponDiscountPaise: pricing.couponDiscountPaise,
+      couponId: pricing.coupon?.id ?? null,
+    };
   } catch (err) {
     res.status(400).json({
       error: err instanceof Error ? err.message : "Invalid cart",
@@ -237,7 +257,7 @@ router.post("/guest-checkout", async (req, res) => {
       orderId = await createOrderRecord(user.id, totalPaise, lineItems, {
         ...shipping,
         addressId,
-      }, checkoutSessionId);
+      }, checkoutSessionId, pricingBreakdown);
     } catch (err: any) {
       if (checkoutSessionId && err?.code === "23505") {
         checkoutOrder = await findReusableCheckoutOrder(user.id, checkoutSessionId);
@@ -249,6 +269,15 @@ router.post("/guest-checkout", async (req, res) => {
       if (!orderId) {
         throw err;
       }
+    }
+  }
+
+  // Record coupon usage if a coupon was applied
+  if (pricingBreakdown?.couponId && orderId) {
+    try {
+      await recordCouponUsage(pricingBreakdown.couponId, user.id, orderId);
+    } catch (err) {
+      console.error("[Orders] Failed to record coupon usage:", err);
     }
   }
 

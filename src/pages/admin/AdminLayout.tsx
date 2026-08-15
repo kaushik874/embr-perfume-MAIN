@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation, Redirect } from "wouter";
-import { LayoutDashboard, ShoppingBag, Users, Package, LogOut, Ticket, Star, FileText, Send, ShieldAlert, Image as ImageIcon, BookOpen, BarChart2 } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Users, Package, LogOut, Ticket, Star, FileText, Send, ShieldAlert, Image as ImageIcon, BookOpen, BarChart2, IndianRupee } from "lucide-react";
 import { toast } from "sonner";
 import { SITE_LOGO, SITE_NAME } from "@/lib/site-brand";
 
@@ -23,6 +23,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     { href: "/admin/analytics", label: "Analytics", icon: BarChart2 },
     { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
     { href: "/admin/products", label: "Products", icon: Package },
+    { href: "/admin/pricing", label: "Product Pricing", icon: IndianRupee },
     { href: "/admin/hero", label: "Hero Banners", icon: ImageIcon },
     { href: "/admin/about", label: "Our Story Page", icon: BookOpen },
     { href: "/admin/customers", label: "Customers", icon: Users },

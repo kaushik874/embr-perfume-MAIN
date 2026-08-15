@@ -29,6 +29,7 @@ import { AdminContent } from "@/pages/admin/AdminContent";
 import { AdminSecurity } from "@/pages/admin/AdminSecurity";
 import { AdminHero } from "@/pages/admin/AdminHero";
 import { AdminAbout } from "@/pages/admin/AdminAbout";
+import { AdminPricing } from "@/pages/admin/AdminPricing";
 import { AdminAnalytics } from "@/pages/admin/AdminAnalytics";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { useScrollRestoration } from "@/hooks/use-scroll-restoration";
@@ -54,6 +55,7 @@ const AdminMarketingRoute = AdminMarketing;
 const AdminContentRoute = AdminContent;
 const AdminHeroRoute = AdminHero;
 const AdminAboutRoute = AdminAbout;
+const AdminPricingRoute = AdminPricing;
 const AdminSecurityRoute = AdminSecurity;
 const AdminDashboardRoute = AdminDashboard;
 
@@ -67,6 +69,7 @@ function App() {
           <Route path="/admin/analytics" component={AdminAnalyticsRoute} />
           <Route path="/admin/orders" component={AdminOrdersRoute} />
           <Route path="/admin/products" component={AdminProductsRoute} />
+          <Route path="/admin/pricing" component={AdminPricingRoute} />
           <Route path="/admin/customers" component={AdminUsersRoute} />
           <Route path="/admin/users" component={AdminUsersRoute} />
           <Route path="/admin/coupons" component={AdminCouponsRoute} />

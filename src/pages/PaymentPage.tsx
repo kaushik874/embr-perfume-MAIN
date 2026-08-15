@@ -9,6 +9,9 @@ import {
   ShieldCheck,
   Smartphone,
   Wallet,
+  Tag,
+  Loader2,
+  X as XIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
@@ -118,10 +121,62 @@ export function PaymentPage() {
   const openingRef = useRef(false);
   const paymentResolvedRef = useRef(false);
 
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount_type: string;
+    discount_value: number;
+  } | null>(null);
+  const [pricingBreakdown, setPricingBreakdown] = useState<{
+    subtotalPaise: number;
+    shippingPaise: number;
+    couponDiscountPaise: number;
+    totalPaise: number;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
   const orderItems = useMemo(
     () => items.map((i) => ({ slug: i.product.slug, quantity: i.quantity })),
     [items],
   );
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim() || couponApplying) return;
+    setCouponApplying(true);
+    setCouponError(null);
+    try {
+      const result = await api.validateCoupon({
+        code: couponCode.trim(),
+        items: orderItems,
+      });
+      if (result.valid && result.coupon) {
+        setAppliedCoupon(result.coupon);
+        setPricingBreakdown({
+          subtotalPaise: result.subtotalPaise,
+          shippingPaise: result.shippingPaise,
+          couponDiscountPaise: result.couponDiscountPaise,
+          totalPaise: result.totalPaise,
+        });
+        setCouponError(null);
+      } else {
+        setCouponError(result.error || "Invalid coupon code");
+        setAppliedCoupon(null);
+      }
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : "Could not validate coupon");
+      setAppliedCoupon(null);
+    } finally {
+      setCouponApplying(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setPricingBreakdown(null);
+    setCouponCode("");
+    setCouponError(null);
+  };
 
   useEffect(() => {
     void syncProducts();
@@ -160,6 +215,7 @@ export function PaymentPage() {
       const result = await api.guestCheckout({
         items: orderItems,
         checkoutSessionId,
+        couponCode: appliedCoupon?.code,
         shipping: {
           name: shipping.name,
           email: shipping.email,
@@ -432,13 +488,80 @@ export function PaymentPage() {
                     <p className="font-medium">{i.product.name}</p>
                     <p className="text-xs text-ink-muted">Qty {i.quantity}</p>
                   </div>
-                  <span className="font-display text-gold-deep">Rs {i.product.price * i.quantity}</span>
+                  <span className="font-display text-gold-deep">₹{i.product.price * i.quantity}</span>
                 </li>
               ))}
             </ul>
-            <div className="mt-6 flex justify-between border-t border-border-light pt-4">
+
+            <div className="mt-5 border-t border-border-light pt-4">
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-emerald-700" />
+                    <div>
+                      <span className="text-sm font-medium text-emerald-800">{appliedCoupon.code}</span>
+                      <span className="ml-1 text-xs text-emerald-600">
+                        ({appliedCoupon.discount_type === "percent" ? `${appliedCoupon.discount_value}% off` : `₹${appliedCoupon.discount_value} off`})
+                      </span>
+                    </div>
+                  </div>
+                  <button onClick={removeCoupon} className="rounded p-1 text-emerald-700 hover:bg-emerald-100">
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(null); }}
+                      placeholder="Enter coupon code"
+                      className="flex-1 rounded-lg border border-border-light bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:border-gold-deep focus:outline-none"
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } }}
+                    />
+                    <button
+                      onClick={applyCoupon}
+                      disabled={!couponCode.trim() || couponApplying}
+                      className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      {couponApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
+                    </button>
+                  </div>
+                  {couponError && <p className="mt-2 text-xs text-rose-600">{couponError}</p>}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 space-y-2 border-t border-border-light pt-4 text-sm">
+              <div className="flex justify-between text-ink-muted">
+                <span>Subtotal</span>
+                <span>₹{pricingBreakdown ? (pricingBreakdown.subtotalPaise / 100).toFixed(0) : total}</span>
+              </div>
+              {pricingBreakdown && pricingBreakdown.couponDiscountPaise > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Coupon ({appliedCoupon?.code})</span>
+                  <span>-₹{(pricingBreakdown.couponDiscountPaise / 100).toFixed(0)}</span>
+                </div>
+              )}
+              {pricingBreakdown && pricingBreakdown.shippingPaise > 0 ? (
+                <div className="flex justify-between text-ink-muted">
+                  <span>Shipping</span>
+                  <span>₹{(pricingBreakdown.shippingPaise / 100).toFixed(0)}</span>
+                </div>
+              ) : pricingBreakdown ? (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Shipping</span>
+                  <span>Free</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex justify-between border-t border-border-light pt-4">
               <span className="font-display tracking-widest text-ink-muted">TOTAL</span>
-              <span className="font-display text-2xl text-gold-deep">Rs {total}</span>
+              <span className="font-display text-2xl text-gold-deep">
+                ₹{pricingBreakdown ? (pricingBreakdown.totalPaise / 100).toFixed(0) : total}
+              </span>
             </div>
             <Link href="/cart" className="mt-5 block text-center text-sm tracking-widest text-ink-muted hover:text-gold-deep">
               BACK TO BAG

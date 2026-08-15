@@ -62,6 +62,7 @@ export type ProductFull = {
   display_crop_x?: number | null;
   display_crop_y?: number | null;
   display_crop_zoom?: number | null;
+  shipping_charge?: number;
 };
 
 export type Pagination = {
@@ -82,6 +83,11 @@ export const adminApi = {
   updateProduct: (id: number, body: any) => request<{ ok: boolean }>(`/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteProduct: (id: number) => request<{ ok: boolean }>(`/products/${id}`, { method: "DELETE" }),
   updateStock: (id: number, stock: number) => request<{ ok: boolean }>(`/products/${id}/stock`, { method: "PATCH", body: JSON.stringify({ stock }) }),
+  updateProductShipping: (id: number, shippingCharge: number) =>
+    request<{ ok: boolean }>(`/products/${id}/shipping`, {
+      method: "PATCH",
+      body: JSON.stringify({ shipping_charge: shippingCharge }),
+    }),
   uploadImages: (id: number, images: {
     name: string;
     type: string;

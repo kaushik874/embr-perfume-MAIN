@@ -270,6 +270,7 @@ export const api = {
   guestCheckout: (body: {
     items: { slug: string; quantity: number }[];
     checkoutSessionId?: string;
+    couponCode?: string;
     shipping: {
       name: string;
       email: string;
@@ -353,6 +354,28 @@ export const api = {
       failureReason: string | null;
     }>(`/orders/${orderId}/payment-status${suffix}`);
   },
+  validateCoupon: (body: {
+    code: string;
+    items: { slug: string; quantity: number }[];
+  }) =>
+    request<{
+      valid: boolean;
+      coupon?: {
+        code: string;
+        discount_type: string;
+        discount_value: number;
+        min_order_value: number | null;
+        max_discount: number | null;
+      };
+      subtotalPaise: number;
+      shippingPaise: number;
+      couponDiscountPaise: number;
+      totalPaise: number;
+      error?: string;
+    }>("/coupons/validate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 export const adminApi = {
@@ -379,6 +402,8 @@ export const adminApi = {
   getCoupons: () => request<{ coupons: any[] }>("/admin/coupons"),
   createCoupon: (body: any) => request<{ ok: boolean, id: number }>("/admin/coupons", { method: "POST", body: JSON.stringify(body) }),
   deleteCoupon: (id: number) => request<{ ok: boolean }>(`/admin/coupons/${id}`, { method: "DELETE" }),
+  updateCoupon: (id: number, body: any) => request<{ ok: boolean }>(`/admin/coupons/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  toggleCouponStatus: (id: number, status: string) => request<{ ok: boolean }>(`/admin/coupons/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
 
   getOrder: (id: number) => request<{ order: Order; items: any[] }>(`/admin/orders/${id}`),
   updateOrderStatus: (id: number, status: string) => request<{ ok: boolean }>(`/admin/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),

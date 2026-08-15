@@ -504,4 +504,22 @@ router.patch("/products/:id/stock", async (req, res) => {
   res.json({ ok: true });
 });
 
+
+router.patch("/products/:id/shipping", async (req, res) => {
+  const schema = z.object({ shipping_charge: z.number().int().nonnegative() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const result = await db.prepare("UPDATE products SET shipping_charge = ? WHERE id = ?")
+    .run(parsed.data.shipping_charge, req.params.id);
+  if (result.changes === 0) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+  logAdminAction(req.user!.userId, "update_shipping", `Updated shipping charge for product #${req.params.id} to ₹${parsed.data.shipping_charge}`);
+  res.json({ ok: true });
+});
+
 export default router;
