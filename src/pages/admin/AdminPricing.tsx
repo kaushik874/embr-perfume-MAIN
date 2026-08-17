@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { adminApi, type ProductFull, type Pagination } from "@/lib/admin-api";
+import { adminApi as apiAdminApi } from "@/lib/api";
 import { AdminLayout } from "./AdminLayout";
 import { toast } from "sonner";
 import { Save, Truck } from "lucide-react";
@@ -28,21 +29,18 @@ export function AdminPricing() {
 
   useEffect(() => {
     fetchProducts();
-    // Fetch global settings from admin API
-    import("@/lib/api").then(({ api }) => {
-      api.adminApi.getContent().then(res => {
-        if (res.content.free_shipping_threshold_inr) {
-          setThreshold(res.content.free_shipping_threshold_inr);
-        }
-      }).catch(console.error);
-    });
+    // Fetch global free shipping threshold setting
+    apiAdminApi.getContent().then(res => {
+      if (res.content.free_shipping_threshold_inr) {
+        setThreshold(res.content.free_shipping_threshold_inr);
+      }
+    }).catch(console.error);
   }, [fetchProducts]);
 
   const handleSaveThreshold = async () => {
     setThresholdLoading(true);
     try {
-      const { api } = await import("@/lib/api");
-      await api.adminApi.updateContent("free_shipping_threshold_inr", threshold);
+      await apiAdminApi.updateContent("free_shipping_threshold_inr", threshold);
       toast.success("Free shipping threshold updated");
     } catch (err: any) {
       toast.error(err.message);

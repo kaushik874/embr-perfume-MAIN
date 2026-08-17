@@ -141,6 +141,12 @@ export function PaymentPage() {
     [items],
   );
 
+  // Stable serialized key for useEffect dependencies
+  const orderItemsKey = useMemo(
+    () => JSON.stringify(orderItems),
+    [orderItems],
+  );
+
   const applyCoupon = async () => {
     if (!couponCode.trim() || couponApplying) return;
     setCouponApplying(true);
@@ -190,10 +196,14 @@ export function PaymentPage() {
       .catch(() => setPricingBreakdown(null));
   };
 
+  // Fetch base pricing (including shipping) on mount / cart change, even without coupon
   useEffect(() => {
-    if (orderItems.length === 0 || appliedCoupon) return;
+    if (orderItems.length === 0) return;
+    if (appliedCoupon) return; // coupon flow handles its own pricing
+    let cancelled = false;
     api.validateCoupon({ code: "", items: orderItems })
       .then(result => {
+        if (cancelled) return;
         if (result.valid) {
           setPricingBreakdown({
             subtotalPaise: result.subtotalPaise,
@@ -204,7 +214,9 @@ export function PaymentPage() {
         }
       })
       .catch(() => {});
-  }, [orderItems, appliedCoupon]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderItemsKey, appliedCoupon]);
 
   useEffect(() => {
     void syncProducts();
@@ -294,7 +306,7 @@ export function PaymentPage() {
       };
       const options = {
         key: result.keyId,
-        amount: result.amount ?? total * 100,
+        amount: result.amount,
         currency: "INR",
         name: "Embr Parfums",
         description: `${paymentOptions.find((p) => p.id === paymentMethod)?.label ?? "Payment"} for perfume order`,
