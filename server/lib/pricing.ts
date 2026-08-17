@@ -99,7 +99,9 @@ export function calculateCouponDiscount(
   let discountPaise = 0;
 
   if (coupon.discount_type === "percent") {
-    discountPaise = Math.floor(subtotalPaise * coupon.discount_value / 100);
+    // Math.round to nearest 100 paise (1 INR) to ensure no fractional rupees, perfectly matching UI
+    const rawDiscountPaise = subtotalPaise * coupon.discount_value / 100;
+    discountPaise = Math.round(rawDiscountPaise / 100) * 100;
   } else {
     // Fixed discount: discount_value is in INR
     discountPaise = coupon.discount_value * 100;
