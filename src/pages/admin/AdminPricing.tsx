@@ -9,6 +9,10 @@ export function AdminPricing() {
   const [loading, setLoading] = useState(true);
   const [shippingEdits, setShippingEdits] = useState<Record<number, string>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
+  
+  // Global settings
+  const [thresholdLoading, setThresholdLoading] = useState(false);
+  const [threshold, setThreshold] = useState<string>("");
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -24,7 +28,28 @@ export function AdminPricing() {
 
   useEffect(() => {
     fetchProducts();
+    // Fetch global settings from admin API
+    import("@/lib/api").then(({ api }) => {
+      api.adminApi.getContent().then(res => {
+        if (res.content.free_shipping_threshold_inr) {
+          setThreshold(res.content.free_shipping_threshold_inr);
+        }
+      }).catch(console.error);
+    });
   }, [fetchProducts]);
+
+  const handleSaveThreshold = async () => {
+    setThresholdLoading(true);
+    try {
+      const { api } = await import("@/lib/api");
+      await api.adminApi.updateContent("free_shipping_threshold_inr", threshold);
+      toast.success("Free shipping threshold updated");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setThresholdLoading(false);
+    }
+  };
 
   const handleShippingChange = (id: number, value: string) => {
     setShippingEdits((prev) => ({ ...prev, [id]: value }));
@@ -61,7 +86,7 @@ export function AdminPricing() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold font-serif text-gray-900 dark:text-white">
             Product Pricing
@@ -69,6 +94,30 @@ export function AdminPricing() {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Manage shipping charges per product. Shipping is charged once per unique product in the order.
           </p>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-950 p-4 rounded-lg border border-gray-200 dark:border-gray-800 flex items-end gap-4 shadow-sm w-full sm:w-auto">
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Free Shipping Above (₹)
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={threshold}
+              onChange={(e) => setThreshold(e.target.value)}
+              placeholder="e.g. 999"
+              className="w-full sm:w-40 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+          <button
+            onClick={handleSaveThreshold}
+            disabled={thresholdLoading}
+            className="flex items-center gap-1.5 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-colors"
+          >
+            <Save className="w-4 h-4" />
+            {thresholdLoading ? "Saving..." : "Save Limit"}
+          </button>
         </div>
       </div>
 

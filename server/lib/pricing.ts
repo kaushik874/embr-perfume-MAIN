@@ -195,6 +195,24 @@ export async function calculateOrderPricing(
     couponDiscountPaise = calculateCouponDiscount(coupon, subtotalPaise);
   }
 
+  // Free Shipping Threshold logic
+  const freeShippingThresholdContent = await db.prepare(
+    "SELECT value FROM site_content WHERE key = 'free_shipping_threshold_inr'"
+  ).get() as { value?: string } | undefined;
+
+  let freeShippingThresholdPaise: number | null = null;
+  if (freeShippingThresholdContent?.value) {
+    const parsed = parseInt(freeShippingThresholdContent.value, 10);
+    if (!isNaN(parsed) && parsed >= 0) {
+      freeShippingThresholdPaise = parsed * 100;
+    }
+  }
+
+  const finalSubtotalAfterCoupon = subtotalPaise - couponDiscountPaise;
+  if (freeShippingThresholdPaise !== null && finalSubtotalAfterCoupon >= freeShippingThresholdPaise) {
+    shippingPaise = 0; // Free shipping applies
+  }
+
   const totalPaise = subtotalPaise - couponDiscountPaise + shippingPaise;
 
   return {

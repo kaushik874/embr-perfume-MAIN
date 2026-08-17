@@ -173,10 +173,38 @@ export function PaymentPage() {
 
   const removeCoupon = () => {
     setAppliedCoupon(null);
-    setPricingBreakdown(null);
     setCouponCode("");
     setCouponError(null);
+    // Re-fetch base pricing to show shipping correctly
+    api.validateCoupon({ code: "", items: orderItems })
+      .then(result => {
+        if (result.valid) {
+          setPricingBreakdown({
+            subtotalPaise: result.subtotalPaise,
+            shippingPaise: result.shippingPaise,
+            couponDiscountPaise: result.couponDiscountPaise,
+            totalPaise: result.totalPaise,
+          });
+        }
+      })
+      .catch(() => setPricingBreakdown(null));
   };
+
+  useEffect(() => {
+    if (orderItems.length === 0 || appliedCoupon) return;
+    api.validateCoupon({ code: "", items: orderItems })
+      .then(result => {
+        if (result.valid) {
+          setPricingBreakdown({
+            subtotalPaise: result.subtotalPaise,
+            shippingPaise: result.shippingPaise,
+            couponDiscountPaise: result.couponDiscountPaise,
+            totalPaise: result.totalPaise,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [orderItems, appliedCoupon]);
 
   useEffect(() => {
     void syncProducts();

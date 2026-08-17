@@ -10,7 +10,7 @@ import { verifyToken } from "../middleware/auth.js";
 const router = Router();
 
 const validateSchema = z.object({
-  code: z.string().min(1),
+  code: z.string().optional(),
   items: z.array(
     z.object({
       slug: z.string().min(1).optional(),
@@ -46,7 +46,8 @@ router.post("/validate", async (req, res) => {
   }
 
   try {
-    const pricing = await calculateOrderPricing(items, code, userId);
+    const normalizedCode = code?.trim() || undefined;
+    const pricing = await calculateOrderPricing(items, normalizedCode, userId);
     res.json({
       valid: true,
       coupon: pricing.coupon
