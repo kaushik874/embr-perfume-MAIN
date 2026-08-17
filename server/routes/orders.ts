@@ -229,8 +229,10 @@ router.post("/guest-checkout", async (req, res) => {
   }
 
   if (checkoutOrder && checkoutOrder.total_paise !== totalPaise) {
-    res.status(409).json({ error: "Checkout details changed. Please review your bag and try again." });
-    return;
+    // If the cart total changed (e.g. shipping was dynamically added or coupon applied),
+    // invalidate the old order's session ID to free it up for a fresh order.
+    await db.prepare("UPDATE orders SET checkout_session_id = NULL WHERE id = ?").run(checkoutOrder.id);
+    checkoutOrder = undefined;
   }
 
   let orderId = checkoutOrder?.id;
