@@ -6,7 +6,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
-import { initDb } from "./db.js";
+import { initDb, db } from "./db.js";
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
 import orderRoutes from "./routes/orders.js";
@@ -113,6 +113,20 @@ app.use(sanitizeBody);
 
 // Serve uploaded product images
 app.use("/uploads", express.static(path.resolve(process.cwd(), "public/uploads")));
+
+app.get("/api/files/:id", async (req, res) => {
+  try {
+    const file = await db.prepare("SELECT mime_type, data FROM uploaded_files WHERE id = ?").get(req.params.id) as { mime_type: string, data: Buffer } | undefined;
+    if (!file) {
+      return res.status(404).send("Not found");
+    }
+    res.setHeader("Content-Type", file.mime_type);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(file.data);
+  } catch (error) {
+    res.status(500).send("Server Error");
+  }
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({

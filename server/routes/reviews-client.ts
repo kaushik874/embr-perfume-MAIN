@@ -115,7 +115,7 @@ const reviewSchema = z.object({
 });
 
 // Helper to save media
-function saveMediaFiles(files: any[]) {
+async function saveMediaFiles(files: any[]) {
   const savedImages: string[] = [];
   let savedVideo: string | null = null;
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -141,11 +141,14 @@ function saveMediaFiles(files: any[]) {
     }
 
     const filename = `${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
-    const filepath = path.join(UPLOAD_DIR, filename);
-    if (!path.resolve(filepath).startsWith(path.resolve(UPLOAD_DIR))) continue;
-
-    fs.writeFileSync(filepath, buffer);
-    const url = `/uploads/reviews/${filename}`;
+    
+    await db.prepare("INSERT INTO uploaded_files (id, mime_type, data) VALUES (?, ?, ?)").run(
+      filename,
+      mimeType,
+      buffer
+    );
+    
+    const url = `/api/files/${filename}`;
 
     if (mimeType.startsWith("video/") && !savedVideo) {
       savedVideo = url;
@@ -197,7 +200,7 @@ router.post("/:slug", requireAuth, async (req, res) => {
     return;
   }
 
-  const { savedImages, savedVideo } = saveMediaFiles(parsed.data.mediaFiles);
+  const { savedImages, savedVideo } = await saveMediaFiles(parsed.data.mediaFiles);
 
   const result = await db.prepare(`
     INSERT INTO reviews (product_id, user_id, order_id, rating, title, comment, images, video, status)
@@ -238,7 +241,7 @@ router.put("/:id", requireAuth, async (req, res) => {
   let video = review.video;
 
   if (parsed.data.mediaFiles && parsed.data.mediaFiles.length > 0) {
-    const { savedImages, savedVideo } = saveMediaFiles(parsed.data.mediaFiles);
+    const { savedImages, savedVideo } = await saveMediaFiles(parsed.data.mediaFiles);
     // Replace logic for simplicity, or we could merge them.
     images = savedImages; 
     if (savedVideo) video = savedVideo;
