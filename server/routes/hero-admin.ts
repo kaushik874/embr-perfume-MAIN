@@ -100,7 +100,7 @@ router.get("/hero", async (_req, res) => {
   res.json({ banners });
 });
 
-router.post("/hero/upload", async (req, res) => {
+router.post("/hero/upload", (req, res) => {
   const { name, data } = req.body as { name?: string; data?: string };
   if (!name || !data) return res.status(400).json({ error: "name and data required" });
 
@@ -120,15 +120,11 @@ router.post("/hero/upload", async (req, res) => {
     };
     const ext = extByMime[mime] ?? (path.extname(name).replace(".", "") || "png");
     const filename = `hero-${Date.now()}-${crypto.randomUUID()}.${ext}`;
-    
-    await db.prepare("INSERT INTO uploaded_files (id, mime_type, data) VALUES (?, ?, ?)").run(
-      filename,
-      mime,
-      Buffer.from(base64Data, "base64")
-    );
-    
-    res.json({ url: `/api/files/${filename}` });
-  } catch (error) {
+    const dir = path.resolve(process.cwd(), "public/uploads/hero");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, filename), base64Data, "base64");
+    res.json({ url: `/uploads/hero/${filename}` });
+  } catch {
     res.status(500).json({ error: "Upload failed" });
   }
 });

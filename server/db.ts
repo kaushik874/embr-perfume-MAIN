@@ -75,7 +75,6 @@ const insertIdTables = new Set([
   "products",
   "reviews",
   "users",
-  "uploaded_files",
 ]);
 
 function currentExecutor(): Queryable {
@@ -549,13 +548,6 @@ CREATE TABLE IF NOT EXISTS coupon_usages (
   coupon_id INTEGER NOT NULL REFERENCES coupons(id),
   user_id INTEGER NOT NULL REFERENCES users(id),
   order_id INTEGER NOT NULL REFERENCES orders(id),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS uploaded_files (
-  id VARCHAR(255) PRIMARY KEY,
-  mime_type VARCHAR(255) NOT NULL,
-  data BYTEA NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

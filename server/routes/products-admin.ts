@@ -71,7 +71,7 @@ function numberValue(value: unknown, fallback: number | null = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-async function saveProductImageFile(img: { name: string; type: string; data: string }, prefix = ""): Promise<string | null> {
+function saveProductImageFile(img: { name: string; type: string; data: string }, prefix = "") {
   if (!ALLOWED_TYPES.includes(img.type)) return null;
 
   const ext = path.extname(img.name).toLowerCase();
@@ -82,14 +82,11 @@ async function saveProductImageFile(img: { name: string; type: string; data: str
   if (!hasImageSignature(buffer, img.type)) return null;
 
   const filename = `${crypto.randomUUID()}-${prefix}${sanitizeFilename(img.name)}`;
+  const filepath = path.join(UPLOAD_DIR, filename);
+  if (!path.resolve(filepath).startsWith(path.resolve(UPLOAD_DIR))) return null;
 
-  await db.prepare("INSERT INTO uploaded_files (id, mime_type, data) VALUES (?, ?, ?)").run(
-    filename,
-    img.type,
-    buffer
-  );
-
-  return `/api/files/${filename}`;
+  fs.writeFileSync(filepath, buffer);
+  return `/uploads/products/${filename}`;
 }
 
 router.get("/products", async (req, res) => {
@@ -277,12 +274,12 @@ router.post("/products/:id/images", async (req, res) => {
         continue;
       }
 
-      const url = await saveProductImageFile({ name: img.name, type: img.type, data: img.data });
+      const url = saveProductImageFile({ name: img.name, type: img.type, data: img.data });
       if (!url) continue;
 
       const originalUrl =
         img.originalData && img.originalName && img.originalType
-          ? await saveProductImageFile(
+          ? saveProductImageFile(
               { name: img.originalName, type: img.originalType, data: img.originalData },
               "original-",
             )
@@ -373,7 +370,7 @@ router.patch("/products/:id/images/:imageId/crop", async (req, res) => {
     return;
   }
 
-  const url = await saveProductImageFile({ name: image.name, type: image.type, data: image.data }, "crop-");
+  const url = saveProductImageFile({ name: image.name, type: image.type, data: image.data }, "crop-");
   if (!url) {
     res.status(400).json({ error: "No valid cropped image was saved" });
     return;
@@ -415,7 +412,7 @@ router.patch("/products/:id/display-crop", async (req, res) => {
     return;
   }
 
-  const url = await saveProductImageFile({ name: image.name, type: image.type, data: image.data }, "display-crop-");
+  const url = saveProductImageFile({ name: image.name, type: image.type, data: image.data }, "display-crop-");
   if (!url) {
     res.status(400).json({ error: "No valid cropped image was saved" });
     return;
