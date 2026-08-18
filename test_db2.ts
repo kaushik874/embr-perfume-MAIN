@@ -1,0 +1,1 @@
+import 'dotenv/config'; import { db } from './server/db.ts'; async function main() { const files = await db.prepare('SELECT id, imageUrl FROM hero_banners LIMIT 5').all(); console.log(JSON.stringify(files, null, 2)); process.exit(0); } main().catch(console.error);

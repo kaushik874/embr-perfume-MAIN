@@ -1,0 +1,1 @@
+import 'dotenv/config'; import { db } from './server/db.ts'; async function main() { const file = await db.prepare('SELECT mime_type, data FROM uploaded_files LIMIT 1').get(); console.log('isBuffer:', Buffer.isBuffer(file.data), 'type:', typeof file.data); process.exit(0); } main().catch(console.error);

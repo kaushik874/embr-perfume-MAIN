@@ -24,17 +24,13 @@ router.post("/content", async (req, res) => {
 });
 
 // POST upload content image
-router.post("/content/upload", (req, res) => {
+router.post("/content/upload", async (req, res) => {
   const { name, data } = req.body;
   if (!data || !name) return res.status(400).json({ error: "name and data required" });
   try {
-    const base64Data = data.replace(/^data:image\/\w+;base64,/, "");
-    const ext = name.split('.').pop() || 'png';
-    const filename = `cms-${Date.now()}.${ext}`;
-    const dir = path.resolve(process.cwd(), "public/uploads");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, filename), base64Data, "base64");
-    res.json({ url: `/uploads/${filename}` });
+    const { uploadToCloudinary } = await import("../lib/cloudinary.js");
+    const url = await uploadToCloudinary(data, "content");
+    res.json({ url });
   } catch (err) {
     res.status(500).json({ error: "Upload failed" });
   }

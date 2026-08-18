@@ -77,7 +77,7 @@ router.put("/about", async (req, res) => {
 });
 
 // Admin: upload image for about banner
-router.post("/about/upload", (req, res) => {
+router.post("/about/upload", async (req, res) => {
   const { name, data } = req.body as { name?: string; data?: string };
   if (!name || !data) return res.status(400).json({ error: "name and data required" });
 
@@ -85,22 +85,9 @@ router.post("/about/upload", (req, res) => {
   if (!match) return res.status(400).json({ error: "Only image uploads are allowed" });
 
   try {
-    const mime = match[1].toLowerCase();
-    const base64Data = match[2];
-    const extByMime: Record<string, string> = {
-      "image/png": "png",
-      "image/jpeg": "jpg",
-      "image/jpg": "jpg",
-      "image/webp": "webp",
-      "image/gif": "gif",
-      "image/avif": "avif",
-    };
-    const ext = extByMime[mime] ?? (path.extname(name).replace(".", "") || "png");
-    const filename = `about-${Date.now()}-${crypto.randomUUID()}.${ext}`;
-    const dir = path.resolve(process.cwd(), "public/uploads/about");
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, filename), base64Data, "base64");
-    res.json({ url: `/uploads/about/${filename}` });
+    const { uploadToCloudinary } = await import("../lib/cloudinary.js");
+    const url = await uploadToCloudinary(data, "about");
+    res.json({ url });
   } catch {
     res.status(500).json({ error: "Upload failed" });
   }

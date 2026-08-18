@@ -1,0 +1,1 @@
+import 'dotenv/config'; import { db } from './server/db.ts'; async function main() { const files = await db.prepare('SELECT id, mime_type, length(data) as size FROM uploaded_files LIMIT 5').all(); console.log(JSON.stringify(files, null, 2)); process.exit(0); } main().catch(console.error);

@@ -34,10 +34,12 @@ function hasImageSignature(buffer: Buffer, mimeType: string) {
   return false;
 }
 
-function saveMediaFiles(files: any[]) {
+async function saveMediaFiles(files: any[]) {
   const savedImages: string[] = [];
   let savedVideo: string | null = null;
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+  const { uploadToCloudinary, uploadVideoToCloudinary } = await import("../lib/cloudinary.js");
 
   for (const file of files) {
     if (!file.data || !file.name || !file.type) continue;
@@ -56,17 +58,17 @@ function saveMediaFiles(files: any[]) {
       }
     }
 
-    const filename = `${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
-    const filepath = path.join(UPLOAD_DIR, filename);
-    if (!path.resolve(filepath).startsWith(path.resolve(UPLOAD_DIR))) continue;
-
-    fs.writeFileSync(filepath, buffer);
-    const url = `/uploads/reviews/${filename}`;
-
-    if (mimeType.startsWith("video/") && !savedVideo) {
-      savedVideo = url;
-    } else if (mimeType.startsWith("image/")) {
-      savedImages.push(url);
+    try {
+      let url: string;
+      if (mimeType.startsWith("video/") && !savedVideo) {
+        url = await uploadVideoToCloudinary(file.data, "reviews");
+        savedVideo = url;
+      } else if (mimeType.startsWith("image/")) {
+        url = await uploadToCloudinary(file.data, "reviews");
+        savedImages.push(url);
+      }
+    } catch {
+      continue;
     }
   }
 
@@ -114,7 +116,7 @@ router.post("/reviews", async (req, res) => {
     return;
   }
 
-  const { savedImages, savedVideo } = saveMediaFiles(parsed.data.mediaFiles);
+  const { savedImages, savedVideo } = await saveMediaFiles(parsed.data.mediaFiles);
 
   const result = await db.prepare(`
     INSERT INTO reviews (product_id, user_id, rating, title, comment, customer_name, customer_email, customer_phone, images, video, status, created_at)
@@ -154,7 +156,7 @@ router.put("/reviews/:id", async (req, res) => {
   let video = existing.video;
 
   if (parsed.data.mediaFiles && parsed.data.mediaFiles.length > 0) {
-    const { savedImages, savedVideo } = saveMediaFiles(parsed.data.mediaFiles);
+    const { savedImages, savedVideo } = await saveMediaFiles(parsed.data.mediaFiles);
     // Overwrite for admin edit
     images = savedImages;
     if (savedVideo) video = savedVideo;
