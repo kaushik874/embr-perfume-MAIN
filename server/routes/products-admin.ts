@@ -72,20 +72,12 @@ function numberValue(value: unknown, fallback: number | null = null) {
 }
 
 async function saveProductImageFile(img: { name: string; type: string; data: string }, prefix = ""): Promise<string | null> {
-  if (!ALLOWED_TYPES.includes(img.type)) return null;
-
-  const ext = path.extname(img.name).toLowerCase();
-  if (!ALLOWED_EXTENSIONS.includes(ext)) return null;
-
-  const buffer = Buffer.from(img.data, "base64");
-  if (buffer.length > MAX_FILE_SIZE) return null;
-  if (!hasImageSignature(buffer, img.type)) return null;
-
   try {
     const { uploadToCloudinary } = await import("../lib/cloudinary.js");
     const dataUrl = `data:${img.type};base64,${img.data}`;
     return await uploadToCloudinary(dataUrl, "products");
-  } catch {
+  } catch (error) {
+    console.error("Product image upload error:", error);
     return null;
   }
 }

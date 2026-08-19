@@ -91,16 +91,9 @@ app.use(
 // Webhook must be parsed as raw buffer before express.json()
 app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
 
-app.use("/api/admin/products", express.json({ limit: "35mb" }));
-app.use("/api/admin/hero/upload", express.json({ limit: "35mb" }));
-app.use("/api/admin/about/upload", express.json({ limit: "35mb" }));
-app.use("/api/admin/content/upload", express.json({ limit: "35mb" }));
-// Rate limit review upload endpoints more aggressively
-app.use("/api/admin/reviews", express.json({ limit: "100mb" }));
-app.use("/api/reviews", express.json({ limit: "100mb" }));
+app.use(express.json({ limit: "100mb" }));
 app.use("/api/admin/reviews", uploadLimiter);
 app.use("/api/reviews", uploadLimiter);
-app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(csrfProtection);
 app.use("/api", apiLimiter);

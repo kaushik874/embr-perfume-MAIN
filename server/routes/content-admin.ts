@@ -31,8 +31,9 @@ router.post("/content/upload", async (req, res) => {
     const { uploadToCloudinary } = await import("../lib/cloudinary.js");
     const url = await uploadToCloudinary(data, "content");
     res.json({ url });
-  } catch (err) {
-    res.status(500).json({ error: "Upload failed" });
+  } catch (error) {
+    console.error("Content upload error:", error);
+    res.status(500).json({ error: "Upload failed: " + (error instanceof Error ? error.message : String(error)) });
   }
 });
 

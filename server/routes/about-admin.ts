@@ -81,15 +81,16 @@ router.post("/about/upload", async (req, res) => {
   const { name, data } = req.body as { name?: string; data?: string };
   if (!name || !data) return res.status(400).json({ error: "name and data required" });
 
-  const match = data.match(/^data:(image\/(?:png|jpe?g|webp|gif|avif));base64,(.+)$/i);
+  const match = data.match(/^data:(image\/[^;]+);base64,(.+)$/i);
   if (!match) return res.status(400).json({ error: "Only image uploads are allowed" });
 
   try {
     const { uploadToCloudinary } = await import("../lib/cloudinary.js");
     const url = await uploadToCloudinary(data, "about");
     res.json({ url });
-  } catch {
-    res.status(500).json({ error: "Upload failed" });
+  } catch (error) {
+    console.error("About upload error:", error);
+    res.status(500).json({ error: "Upload failed: " + (error instanceof Error ? error.message : String(error)) });
   }
 });
 
