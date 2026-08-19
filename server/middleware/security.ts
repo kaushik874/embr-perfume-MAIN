@@ -158,13 +158,20 @@ export function sanitize(value: string): string {
  * Recursively sanitize all string values in an object (including nested objects).
  * Handles checkout shipping fields and any other deeply nested input.
  */
-function sanitizeDeep(value: unknown): unknown {
-  if (typeof value === "string") return sanitize(value);
-  if (Array.isArray(value)) return value.map(sanitizeDeep);
+function sanitizeDeep(value: unknown, keyName?: string): unknown {
+  // Skip massive base64 strings to prevent regex event-loop blocking (causes 5-10s delays)
+  if (typeof value === "string") {
+    if (value.length > 50000 && value.startsWith("data:image")) return value;
+    if (keyName === "data" || keyName === "images" || keyName === "video") return value;
+    return sanitize(value);
+  }
+  
+  if (Array.isArray(value)) return value.map(v => sanitizeDeep(v, keyName));
+  
   if (value && typeof value === "object") {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      result[k] = sanitizeDeep(v);
+      result[k] = sanitizeDeep(v, k);
     }
     return result;
   }

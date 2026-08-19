@@ -205,7 +205,7 @@ router.put("/products/:id", async (req, res) => {
       slug = @slug, name = @name, notes = @notes, description = @description,
       price = @price, mrp = @mrp, discount_price = @discount_price,
       stock = @stock, sku = @sku, category = @category, status = @status,
-      tags = @tags, image = @image, collection_type = @collection_type, bestseller = @bestseller,
+      tags = @tags, collection_type = @collection_type, bestseller = @bestseller,
       key_features = @key_features, how_to_apply = @how_to_apply, legal_information = @legal_information,
       head_notes = @head_notes, heart_notes = @heart_notes, base_notes = @base_notes, review = @review
     WHERE id = @id
@@ -269,22 +269,16 @@ router.post("/products/:id/images", async (req, res) => {
     }
 
     const savedUrls: string[] = [];
-    for (let i = 0; i < images.length; i++) {
-      const img = images[i];
-      if (!img || !img.data || !img.name || !img.type) {
-        continue;
-      }
+    await Promise.all(images.map(async (img: any, i: number) => {
+      if (!img || !img.data || !img.name || !img.type) return;
 
       const url = await saveProductImageFile({ name: img.name, type: img.type, data: img.data });
-      if (!url) continue;
+      if (!url) return;
 
-      const originalUrl =
-        img.originalData && img.originalName && img.originalType
-          ? await saveProductImageFile(
-              { name: img.originalName, type: img.originalType, data: img.originalData },
-              "original-",
-            )
-          : null;
+      const originalUrl = img.originalData && img.originalName && img.originalType
+        ? await saveProductImageFile({ name: img.originalName, type: img.originalType, data: img.originalData }, "original-")
+        : null;
+      
       const crop = img.crop && typeof img.crop === "object" ? img.crop : {};
       savedUrls.push(url);
 
@@ -299,7 +293,7 @@ router.post("/products/:id/images", async (req, res) => {
         numberValue(crop.zoom),
         maxSort + 1 + i,
       );
-    }
+    }));
 
     if (savedUrls.length === 0) {
       res.status(400).json({ error: "No valid images were saved" });

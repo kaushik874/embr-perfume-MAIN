@@ -95,11 +95,18 @@ export function AdminProducts() {
   const [pendingUploadFiles, setPendingUploadFiles] = useState<File[]>([]);
   const [uploadCrop, setUploadCrop] = useState<{ file: File; preview: string } | null>(null);
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string> = { page: String(page), limit: "20", sort };
-      if (search) params.search = search;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (categoryFilter) params.category = categoryFilter;
       if (statusFilter) params.status = statusFilter;
       if (stockFilter) params.stock = stockFilter;
@@ -111,7 +118,7 @@ export function AdminProducts() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, categoryFilter, statusFilter, stockFilter, sort]);
+  }, [page, debouncedSearch, categoryFilter, statusFilter, stockFilter, sort]);
 
   const fetchCategories = useCallback(async () => {
     try {
