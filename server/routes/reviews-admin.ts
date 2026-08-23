@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { uploadToCloudinary, uploadVideoToCloudinary } from "../lib/cloudinary.js";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
@@ -39,7 +40,7 @@ async function saveMediaFiles(files: any[]) {
   let savedVideo: string | null = null;
   const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-  const { uploadToCloudinary, uploadVideoToCloudinary } = await import("../lib/cloudinary.js");
+
 
   for (const file of files) {
     if (!file.data || !file.name || !file.type) continue;

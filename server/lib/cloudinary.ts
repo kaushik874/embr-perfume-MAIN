@@ -1,10 +1,22 @@
 import { v2 as cloudinary } from "cloudinary";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+let configured = false;
+
+function ensureConfig() {
+  if (configured) return;
+  const cloud_name = process.env.CLOUDINARY_CLOUD_NAME;
+  const api_key = process.env.CLOUDINARY_API_KEY;
+  const api_secret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloud_name || !api_key || !api_secret) {
+    throw new Error(
+      `Cloudinary credentials missing. cloud_name=${cloud_name ? "SET" : "MISSING"}, api_key=${api_key ? "SET" : "MISSING"}, api_secret=${api_secret ? "SET" : "MISSING"}. Check your .env file or hosting environment variables.`
+    );
+  }
+
+  cloudinary.config({ cloud_name, api_key, api_secret });
+  configured = true;
+}
 
 /**
  * Upload a base64 data URL to Cloudinary and return the secure URL.
@@ -15,6 +27,7 @@ export async function uploadToCloudinary(
   dataUrl: string,
   folder: string,
 ): Promise<string> {
+  ensureConfig();
   const result = await cloudinary.uploader.upload(dataUrl, {
     folder: `embr/${folder}`,
     resource_type: "auto",
@@ -44,6 +57,7 @@ export async function uploadVideoToCloudinary(
   dataUrl: string,
   folder: string,
 ): Promise<string> {
+  ensureConfig();
   const result = await cloudinary.uploader.upload(dataUrl, {
     folder: `embr/${folder}`,
     resource_type: "video",

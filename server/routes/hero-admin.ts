@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { uploadToCloudinary } from "../lib/cloudinary.js";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -87,7 +88,6 @@ router.post("/hero/upload", async (req, res) => {
   if (!match) return res.status(400).json({ error: "Only image uploads are allowed" });
 
   try {
-    const { uploadToCloudinary } = await import("../lib/cloudinary.js");
     const url = await uploadToCloudinary(data, "hero");
     res.json({ url });
   } catch (error) {

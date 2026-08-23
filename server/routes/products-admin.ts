@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db.js";
 import { logAdminAction } from "../middleware/security.js";
+import { uploadToCloudinary } from "../lib/cloudinary.js";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -73,7 +74,6 @@ function numberValue(value: unknown, fallback: number | null = null) {
 
 async function saveProductImageFile(img: { name: string; type: string; data: string }, prefix = ""): Promise<string | null> {
   try {
-    const { uploadToCloudinary } = await import("../lib/cloudinary.js");
     const dataUrl = `data:${img.type};base64,${img.data}`;
     return await uploadToCloudinary(dataUrl, "products");
   } catch (error) {

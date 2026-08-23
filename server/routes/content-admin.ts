@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { uploadToCloudinary } from "../lib/cloudinary.js";
 import fs from "fs";
 import path from "path";
 
@@ -28,7 +29,6 @@ router.post("/content/upload", async (req, res) => {
   const { name, data } = req.body;
   if (!data || !name) return res.status(400).json({ error: "name and data required" });
   try {
-    const { uploadToCloudinary } = await import("../lib/cloudinary.js");
     const url = await uploadToCloudinary(data, "content");
     res.json({ url });
   } catch (error) {
