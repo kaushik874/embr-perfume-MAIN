@@ -516,7 +516,7 @@ export function ProductPage() {
 
   const catalogProduct = getCatalogProduct(slug);
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["product", slug],
     queryFn: () => api.product(slug),
     enabled: Boolean(slug),
