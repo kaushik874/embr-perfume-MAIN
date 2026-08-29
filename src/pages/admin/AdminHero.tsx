@@ -724,7 +724,7 @@ export function AdminHero() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Floating Badge</Label>
+                    <Label>Floating Badge (Optional)</Label>
                     <Input
                       value={banner.badge}
                       onChange={(event) => updateField(index, "badge", event.target.value)}

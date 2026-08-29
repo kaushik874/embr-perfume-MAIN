@@ -584,6 +584,16 @@ export function ProductPage() {
   }, [product, mainImage]);
 
   if (!product) {
+    if (isLoading) {
+      return (
+        <ShopLayout>
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-ink border-t-transparent"></div>
+          </div>
+        </ShopLayout>
+      );
+    }
+    
     return (
       <ShopLayout>
         <div className="mx-auto max-w-lg px-6 py-32 text-center">
