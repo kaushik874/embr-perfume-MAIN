@@ -75,16 +75,16 @@ function patchHistoryForScroll() {
   window.addEventListener("popstate", () => {
     saveActiveScroll();
     lastNavigationKind = "pop";
-  });
+  }, { capture: true });
+}
+
+if (typeof window !== "undefined") {
+  patchHistoryForScroll();
 }
 
 export function useScrollRestoration() {
   const [location] = useLocation();
   const previousKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    patchHistoryForScroll();
-  }, []);
 
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout> | undefined;
