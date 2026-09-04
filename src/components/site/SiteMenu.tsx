@@ -63,7 +63,7 @@ export function SiteMenu({ variant = "light" }: SiteMenuProps) {
               {item.label}
             </Link>
           ))}
-          {user?.role === "admin" && (
+          {(user?.role || "").trim().toLowerCase() === "admin" && (
             <Link
               href="/admin"
               onClick={() => setOpen(false)}

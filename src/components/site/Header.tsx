@@ -52,7 +52,7 @@ export function Header({ variant = "dark", className }: HeaderProps) {
           {user && (
             <>
               <span className={cn("hidden sm:inline", muted)}>{user.name}</span>
-              {user.role === "admin" && (
+              {(user.role || "").trim().toLowerCase() === "admin" && (
                 <Link href="/admin" className={cn("hidden sm:inline hover:text-gold transition-colors font-medium")}>
                   Admin
                 </Link>

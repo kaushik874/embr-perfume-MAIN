@@ -13,7 +13,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   }
 
   const validAdminRoles = ["admin", "superadmin", "manager", "staff"];
-  if (!user || !validAdminRoles.includes(user.role || "")) {
+  const userRole = (user?.role || "").trim().toLowerCase();
+  if (!user || !validAdminRoles.includes(userRole)) {
     toast.error("Admin access required.");
     return <Redirect to="/login" />;
   }

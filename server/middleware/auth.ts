@@ -61,13 +61,14 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     .get(req.user.userId) as { role: string } | undefined;
 
   const validAdminRoles = ["admin", "superadmin", "manager", "staff"];
+  const role = (user?.role || "").trim().toLowerCase();
 
-  if (!user || !validAdminRoles.includes(user.role)) {
+  if (!user || !validAdminRoles.includes(role)) {
     res.status(403).json({ error: "Access denied. Admin role required." });
     return;
   }
   
-  req.user.role = user.role;
+  req.user.role = role;
 
   next();
 }

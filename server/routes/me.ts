@@ -8,11 +8,15 @@ const router = Router();
 router.get("/", requireAuth, async (req, res) => {
   const user = await db
     .prepare("SELECT id, email, name, phone, role, created_at FROM users WHERE id = ?")
-    .get(req.user!.userId);
+    .get(req.user!.userId) as any;
 
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
+  }
+
+  if (user.role) {
+    user.role = String(user.role).trim().toLowerCase();
   }
 
   res.json({ user });
