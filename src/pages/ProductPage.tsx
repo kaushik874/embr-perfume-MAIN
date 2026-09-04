@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
 import { api, type Product } from "@/lib/api";
-import { getCatalogProduct } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/hooks/useWishlist";
 import { ShopLayout } from "@/components/layout/ShopLayout";
@@ -514,13 +513,10 @@ export function ProductPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
-  const catalogProduct = getCatalogProduct(slug);
-
   const { data, isLoading } = useQuery({
     queryKey: ["product", slug],
     queryFn: () => api.product(slug),
     enabled: Boolean(slug),
-    placeholderData: catalogProduct ? { product: catalogProduct } : undefined,
   });
 
   const { data: productsData } = useQuery({
@@ -528,7 +524,7 @@ export function ProductPage() {
     queryFn: () => api.products(),
   });
 
-  const product = data?.product ?? catalogProduct;
+  const product = data?.product ?? null;
   const images = data?.images ?? [];
 
   const galleryImages = useMemo(() => {

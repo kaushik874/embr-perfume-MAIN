@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Header } from "@/components/site/Header";
 import { api, HeroBanner } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export function Hero() {
-  const [banners, setBanners] = useState<HeroBanner[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [current, setCurrent] = useState(0);
+  const { data, isLoading: loaded } = useQuery({
+    queryKey: ["hero-banners"],
+    queryFn: () => api.getHeroBanners(),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    api.getHeroBanners().then((res) => {
-      setBanners(res.banners);
-    }).catch(console.error).finally(() => setLoaded(true));
-  }, []);
+  const banners = data?.banners ?? [];
+  const isLoaded = !loaded;
+  const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -28,7 +29,7 @@ export function Hero() {
   const prevSlide = () => setCurrent((c) => (c - 1 + banners.length) % banners.length);
   const goToSlide = (idx: number) => setCurrent(idx);
 
-  if (!loaded) {
+  if (!isLoaded) {
     return (
       <>
         <Header variant="light" />

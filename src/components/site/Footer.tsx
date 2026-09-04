@@ -1,20 +1,21 @@
-import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useSiteContent } from "@/hooks/use-site-content";
 import { api, FooterColumn } from "@/lib/api";
 import { SITE_LOGO, SITE_NAME } from "@/lib/site-brand";
 
 export function Footer() {
   const { getVal, isReady } = useSiteContent();
-  const [columns, setColumns] = useState<FooterColumn[]>([]);
   const siteLogo = getVal("site_logo", SITE_LOGO);
   const siteName = getVal("site_name", SITE_NAME);
 
-  useEffect(() => {
-    api.getFooter()
-      .then((res) => setColumns(res.columns))
-      .catch(() => {});
-  }, []);
+  const { data } = useQuery({
+    queryKey: ["footer-columns"],
+    queryFn: () => api.getFooter(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const columns = data?.columns ?? [];
 
   return (
     <footer className="border-t border-border-light bg-page pt-12 pb-8 md:pt-20">

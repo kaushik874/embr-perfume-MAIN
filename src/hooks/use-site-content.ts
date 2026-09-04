@@ -12,9 +12,11 @@ export function useSiteContent() {
   const content = data?.content || {};
   const sections = data?.sections || {};
 
-  // Admin-managed content should not show fallback values before settings load.
-  const getVal = (key: string, fallback: string) => isReady ? (content[key] || fallback) : "";
-  const isHidden = (key: string) => !isReady || sections[key] === true;
+  // Show fallback values immediately on first render for fast perceived loading.
+  // Once API data arrives, use the admin-managed values.
+  const getVal = (key: string, fallback: string) => content[key] || fallback;
+  const isHidden = (key: string) => isReady ? sections[key] === true : false;
 
   return { content, sections, getVal, isHidden, isLoading, isReady };
 }
+

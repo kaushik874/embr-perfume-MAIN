@@ -1,4 +1,4 @@
-import { CATALOG_PRODUCTS, getCatalogProduct } from "@/lib/catalog";
+// catalog imports removed — website uses only API-fetched products
 
 function parseError(data: unknown): string {
   if (typeof data === "object" && data !== null && "error" in data) {
@@ -223,7 +223,7 @@ export const api = {
     try {
       return await request<{ products: Product[] }>("/products");
     } catch {
-      return { products: CATALOG_PRODUCTS };
+      return { products: [] };
     }
   },
 
@@ -236,13 +236,7 @@ export const api = {
   },
 
   product: async (slug: string) => {
-    try {
-      return await request<{ product: Product; images?: { url: string }[] }>(`/products/${slug}`);
-    } catch {
-      const product = getCatalogProduct(slug);
-      if (product) return { product };
-      throw new Error("Product not found");
-    }
+    return await request<{ product: Product; images?: { url: string }[] }>(`/products/${slug}`);
   },
 
   orders: () => request<{ orders: Order[] }>("/orders/mine"),

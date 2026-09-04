@@ -75,6 +75,7 @@ function patchHistoryForScroll() {
   window.addEventListener("popstate", () => {
     saveActiveScroll();
     lastNavigationKind = "pop";
+    activeScrollKey = getScrollKey();
   }, { capture: true });
 }
 

@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { api, type Product } from "@/lib/api";
-import { CATALOG_PRODUCTS } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { ShopLayout } from "@/components/layout/ShopLayout";
@@ -96,13 +95,12 @@ export function ProductCard({ product, index }: { product: Product; index: numbe
 
 export function CollectionsPage() {
   useReveal();
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
-    placeholderData: { products: CATALOG_PRODUCTS },
   });
 
-  const sorted = [...(data?.products ?? CATALOG_PRODUCTS)].sort((a, b) => {
+  const sorted = [...(data?.products ?? [])].sort((a, b) => {
     if (a.slug === "milky-way") return -1;
     if (b.slug === "milky-way") return 1;
     return (b.featured ?? 0) - (a.featured ?? 0);
@@ -118,13 +116,27 @@ export function CollectionsPage() {
             </h1>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
-            {sorted.map((p, i) => (
-              <ProductCard key={p.slug} product={p} index={i} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="animate-pulse rounded-lg border border-border-light bg-white p-2.5 md:p-8">
+                  <div className="aspect-square w-full rounded-md bg-gray-200 md:rounded-lg" />
+                  <div className="mt-3 h-4 w-3/4 rounded bg-gray-200" />
+                  <div className="mt-2 h-3 w-1/2 rounded bg-gray-200" />
+                  <div className="mt-3 h-5 w-1/3 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
+              {sorted.map((p, i) => (
+                <ProductCard key={p.slug} product={p} index={i} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </ShopLayout>
   );
 }
+

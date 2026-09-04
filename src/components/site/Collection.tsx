@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { api, type Product } from "@/lib/api";
-import { CATALOG_PRODUCTS } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { useSiteContent } from "@/hooks/use-site-content";
@@ -67,16 +66,32 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
   );
 }
 
+function CollectionSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="animate-pulse rounded-lg border border-border-light bg-white p-2.5 md:p-8">
+          <div className="aspect-square w-full rounded-md bg-gray-200 md:rounded-lg" />
+          <div className="mt-3 h-4 w-3/4 rounded bg-gray-200" />
+          <div className="mt-2 h-3 w-1/2 rounded bg-gray-200" />
+          <div className="mt-3 h-5 w-1/3 rounded bg-gray-200" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Collection() {
   const { getVal, isHidden } = useSiteContent();
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
-    placeholderData: { products: CATALOG_PRODUCTS },
   });
 
-  const primaryProducts = (data?.products ?? CATALOG_PRODUCTS).filter(
+  const products = data?.products ?? [];
+
+  const primaryProducts = products.filter(
     (p) => p.collection_type === "primary" || (!p.collection_type && p.featured === 1)
   );
 
@@ -104,12 +119,17 @@ export function Collection() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
-          {sorted.map((p, i) => (
-            <ProductCard key={p.slug} product={p} index={i} />
-          ))}
-        </div>
+        {isLoading ? (
+          <CollectionSkeleton />
+        ) : sorted.length === 0 ? null : (
+          <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
+            {sorted.map((p, i) => (
+              <ProductCard key={p.slug} product={p} index={i} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
 }
+
