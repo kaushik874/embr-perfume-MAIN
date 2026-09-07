@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
 import { api, type Product } from "@/lib/api";
+import { getCatalogProduct } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/hooks/useWishlist";
 import { ShopLayout } from "@/components/layout/ShopLayout";
@@ -513,10 +514,18 @@ export function ProductPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
+  const cachedProduct = getCatalogProduct(slug);
+
   const { data, isLoading } = useQuery({
     queryKey: ["product", slug],
     queryFn: () => api.product(slug),
     enabled: Boolean(slug),
+    initialData: cachedProduct
+      ? () => ({
+          product: cachedProduct,
+          images: cachedProduct.image ? [{ url: cachedProduct.image }] : [],
+        })
+      : undefined,
   });
 
   const { data: productsData } = useQuery({
@@ -652,13 +661,20 @@ export function ProductPage() {
         className="mx-auto w-full px-[var(--page-padding)] pb-20 pt-5 text-[length:var(--base-font-size)] font-[var(--base-font-weight)] tracking-[var(--letter-spacing)]"
         style={{ ...style, maxWidth: "var(--product-container-width)", margin: "var(--page-margin) auto" }}
       >
-        <Link
-          href="/collections"
-          className="mb-4 lg:mb-8 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-muted hover:text-gold-deep"
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              window.history.back();
+            } else {
+              window.location.href = "/collections";
+            }
+          }}
+          className="mb-4 lg:mb-8 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-muted hover:text-gold-deep cursor-pointer"
         >
           <ChevronLeft className="h-4 w-4" />
           {productPageSettings.text.backToCollections}
-        </Link>
+        </button>
 
         <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-[var(--column-gap)]">
           {heroIds.map((id) => renderSection(id, context))}

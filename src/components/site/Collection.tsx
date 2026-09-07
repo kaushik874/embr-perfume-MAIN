@@ -4,6 +4,7 @@ import { api, type Product } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { useSiteContent } from "@/hooks/use-site-content";
+import { getCachedAdminProducts } from "@/lib/catalog";
 
 function ProductCard({ product, index }: { product: Product; index: number }) {
   const { add } = useCart();
@@ -80,19 +81,21 @@ function CollectionSkeleton() {
     </div>
   );
 }
-
 export function Collection() {
   const { getVal, isHidden } = useSiteContent();
 
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
+    initialData: () => ({ products: getCachedAdminProducts() }),
   });
 
-  const products = data?.products ?? [];
+  const products = (data?.products ?? getCachedAdminProducts()).filter(
+    (p) => p && p.collection_type !== "secondary"
+  );
 
   const primaryProducts = products.filter(
-    (p) => p.collection_type === "primary" || (!p.collection_type && p.featured === 1)
+    (p) => p.collection_type === "primary" || !p.collection_type
   );
 
   const sorted = [...primaryProducts].sort((a, b) => {
@@ -119,14 +122,14 @@ export function Collection() {
           </Link>
         </div>
 
-        {isLoading ? (
-          <CollectionSkeleton />
-        ) : sorted.length === 0 ? null : (
+        {sorted.length > 0 ? (
           <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
             {sorted.map((p, i) => (
               <ProductCard key={p.slug} product={p} index={i} />
             ))}
           </div>
+        ) : (
+          <CollectionSkeleton />
         )}
       </div>
     </section>

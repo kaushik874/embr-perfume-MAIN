@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { useSiteContent } from "@/hooks/use-site-content";
+import { getCachedAdminProducts } from "@/lib/catalog";
 
 const bottleEmber = "/images/bottle-forest.svg";
 
@@ -13,8 +14,9 @@ export function FeatureBanner() {
   const { data } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
+    initialData: () => ({ products: getCachedAdminProducts() }),
   });
-  const featured = data?.products.find((p) => p.slug === "ember-oud");
+  const featured = (data?.products ?? getCachedAdminProducts()).find((p) => p.slug === "ember-oud");
 
   if (isHidden("section_banner")) return null;
 
@@ -47,11 +49,15 @@ export function FeatureBanner() {
             {getVal("banner_desc", "Smoky oud wrapped in warm amber resin. A true classic.")}
           </p>
           <div className="reveal flex flex-wrap items-baseline gap-3 pt-2 sm:gap-4">
-            <span className="font-display text-4xl text-gold-deep sm:text-5xl">₹399</span>
-            <span className="text-ink-muted/60 line-through">₹699</span>
-            <span className="rounded-full bg-gold-deep/15 px-3 py-1 text-xs tracking-widest text-gold-deep">
-              SAVE 44%
-            </span>
+            <span className="font-display text-4xl text-gold-deep sm:text-5xl">₹{featured ? featured.price : 1}</span>
+            {featured && featured.mrp > featured.price && (
+              <span className="text-ink-muted/60 line-through">₹{featured.mrp}</span>
+            )}
+            {featured && featured.mrp > featured.price && (
+              <span className="rounded-full bg-gold-deep/15 px-3 py-1 text-xs tracking-widest text-gold-deep">
+                SAVE {Math.round((1 - featured.price / featured.mrp) * 100)}%
+              </span>
+            )}
           </div>
           <div className="reveal flex flex-wrap items-center gap-4">
             <button
@@ -59,7 +65,7 @@ export function FeatureBanner() {
               onClick={() => {
                 if (featured) {
                   add(featured);
-                  toast.success("Ember Oud added to bag");
+                  toast.success(`${featured.name} added to bag`);
                 }
               }}
               className="rounded-full border-2 border-ink bg-ink px-10 py-4 font-medium tracking-widest text-parchment transition-all hover:scale-[1.03] hover:bg-ink/90"
@@ -78,8 +84,8 @@ export function FeatureBanner() {
         <div className="relative flex h-[280px] items-center justify-center rounded-2xl bg-forest-deep/5 sm:h-[360px] md:h-[460px]">
           <div className="absolute h-[200px] w-[200px] rounded-full bg-gold/20 blur-3xl animate-glow sm:h-[280px] sm:w-[280px] md:h-[340px] md:w-[340px]" />
           <img
-            src={bottleEmber}
-            alt="Ember Oud perfume"
+            src={featured?.image || bottleEmber}
+            alt={featured?.name || "Ember Oud perfume"}
             width={420}
             height={520}
             className="relative z-10 h-[280px] w-auto object-contain drop-shadow-[0_30px_40px_rgba(0,0,0,0.25)] md:h-[360px] animate-float"

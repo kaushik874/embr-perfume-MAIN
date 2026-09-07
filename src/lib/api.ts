@@ -1,4 +1,10 @@
-// catalog imports removed — website uses only API-fetched products
+import {
+  getCachedAdminProducts,
+  setCachedAdminProducts,
+  getCachedHeroBanners,
+  setCachedHeroBanners,
+  getCatalogProduct,
+} from "@/lib/catalog";
 
 function parseError(data: unknown): string {
   if (typeof data === "object" && data !== null && "error" in data) {
@@ -160,7 +166,17 @@ export const api = {
 
   publicConfig: () => request<{ googleClientId: string }>("/config/public"),
 
-  getHeroBanners: () => request<{ banners: HeroBanner[] }>("/hero"),
+  getHeroBanners: async () => {
+    try {
+      const res = await request<{ banners: HeroBanner[] }>("/hero");
+      if (res?.banners && Array.isArray(res.banners) && res.banners.length > 0) {
+        setCachedHeroBanners(res.banners);
+      }
+      return res;
+    } catch {
+      return { banners: getCachedHeroBanners() };
+    }
+  },
 
   getAboutBanner: () => request<{ banner: any }>("/about-banner"),
 
@@ -221,9 +237,15 @@ export const api = {
 
   products: async () => {
     try {
-      return await request<{ products: Product[] }>("/products");
+      const res = await request<{ products: Product[] }>("/products");
+      if (res?.products && Array.isArray(res.products) && res.products.length > 0) {
+        const filtered = res.products.filter((p) => p && p.collection_type !== "secondary");
+        setCachedAdminProducts(filtered);
+        return { products: filtered };
+      }
+      return { products: getCachedAdminProducts() };
     } catch {
-      return { products: [] };
+      return { products: getCachedAdminProducts() };
     }
   },
 
@@ -236,7 +258,15 @@ export const api = {
   },
 
   product: async (slug: string) => {
-    return await request<{ product: Product; images?: { url: string }[] }>(`/products/${slug}`);
+    try {
+      return await request<{ product: Product; images?: { url: string }[] }>(`/products/${slug}`);
+    } catch (err) {
+      const cached = getCatalogProduct(slug);
+      if (cached) {
+        return { product: cached, images: cached.image ? [{ url: cached.image }] : [] };
+      }
+      throw err;
+    }
   },
 
   orders: () => request<{ orders: Order[] }>("/orders/mine"),

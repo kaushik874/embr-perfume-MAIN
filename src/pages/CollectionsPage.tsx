@@ -7,6 +7,7 @@ import { ShopLayout } from "@/components/layout/ShopLayout";
 import { useReveal } from "@/hooks/use-reveal";
 import { Heart } from "lucide-react";
 import { useWishlist } from "@/hooks/useWishlist";
+import { getCachedAdminProducts } from "@/lib/catalog";
 
 export function ProductCard({ product, index }: { product: Product; index: number }) {
   const { add } = useCart();
@@ -95,12 +96,17 @@ export function ProductCard({ product, index }: { product: Product; index: numbe
 
 export function CollectionsPage() {
   useReveal();
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
+    initialData: () => ({ products: getCachedAdminProducts() }),
   });
 
-  const sorted = [...(data?.products ?? [])].sort((a, b) => {
+  const products = (data?.products ?? getCachedAdminProducts()).filter(
+    (p) => p && p.collection_type !== "secondary"
+  );
+
+  const sorted = [...products].sort((a, b) => {
     if (a.slug === "milky-way") return -1;
     if (b.slug === "milky-way") return 1;
     return (b.featured ?? 0) - (a.featured ?? 0);
@@ -116,7 +122,13 @@ export function CollectionsPage() {
             </h1>
           </div>
 
-          {isLoading ? (
+          {sorted.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
+              {sorted.map((p, i) => (
+                <ProductCard key={p.slug} product={p} index={i} />
+              ))}
+            </div>
+          ) : (
             <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="animate-pulse rounded-lg border border-border-light bg-white p-2.5 md:p-8">
@@ -125,12 +137,6 @@ export function CollectionsPage() {
                   <div className="mt-2 h-3 w-1/2 rounded bg-gray-200" />
                   <div className="mt-3 h-5 w-1/3 rounded bg-gray-200" />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
-              {sorted.map((p, i) => (
-                <ProductCard key={p.slug} product={p} index={i} />
               ))}
             </div>
           )}

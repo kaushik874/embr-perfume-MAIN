@@ -35,15 +35,13 @@ export function Header({ variant = "dark", className }: HeaderProps) {
       <div className="flex items-center gap-3">
         <SiteMenu variant={variant} />
         <Link href="/" className={cn("flex items-center", brand)}>
-          {isReady ? (
-            <img
-              src={siteLogo}
-              alt={siteName}
-              className="h-8 w-auto object-contain"
-            />
-          ) : (
-            <span className="block h-8 w-20" aria-hidden="true" />
-          )}
+          <img
+            src={siteLogo || SITE_LOGO}
+            alt={siteName || SITE_NAME}
+            fetchPriority="high"
+            decoding="async"
+            className="h-8 w-auto object-contain"
+          />
         </Link>
       </div>
 

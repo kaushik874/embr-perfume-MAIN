@@ -22,15 +22,12 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl grid-cols-3 gap-8 px-6 md:grid-cols-4 md:px-10">
         {/* Brand column - always first */}
         <div className="col-span-3 md:col-span-1">
-          {isReady ? (
-            <img
-              src={siteLogo}
-              alt={siteName}
-              className="mb-2 h-10 w-auto object-contain"
-            />
-          ) : (
-            <span className="mb-2 block h-10 w-24" aria-hidden="true" />
-          )}
+          <img
+            src={siteLogo || SITE_LOGO}
+            alt={siteName || SITE_NAME}
+            decoding="async"
+            className="mb-2 h-10 w-auto object-contain"
+          />
           <p className="mt-4 max-w-xs text-sm text-ink-muted leading-relaxed">
             {getVal("footer_tagline", "Luxury fragrances forged from fire, forest, petals, and the patience of time.")}
           </p>
