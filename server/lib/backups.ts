@@ -24,6 +24,7 @@ export async function createDatabaseBackup(label = "manual") {
     "users",
     "products",
     "product_images",
+    "product_variants",
     "orders",
     "order_items",
     "coupons",

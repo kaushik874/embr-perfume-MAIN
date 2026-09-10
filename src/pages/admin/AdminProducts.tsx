@@ -1038,11 +1038,13 @@ export function AdminProducts() {
           aspectRatio={PRODUCT_IMAGE_ASPECT_RATIO}
           outputWidth={PRODUCT_IMAGE_OUTPUT_WIDTH}
           outputHeight={PRODUCT_IMAGE_OUTPUT_HEIGHT}
-          initialCrop={existingImages.find(img => img.id === croppingImage.id) ? {
-            x: existingImages.find(img => img.id === croppingImage.id)!.crop_x ?? undefined,
-            y: existingImages.find(img => img.id === croppingImage.id)!.crop_y ?? undefined,
-            zoom: existingImages.find(img => img.id === croppingImage.id)!.crop_zoom ?? undefined,
-          } : undefined}
+          initialCrop={(() => {
+            const found = existingImages.find(img => img.id === croppingImage.id);
+            if (found && typeof found.crop_x === "number" && typeof found.crop_y === "number" && typeof found.crop_zoom === "number") {
+              return { x: found.crop_x, y: found.crop_y, zoom: found.crop_zoom };
+            }
+            return null;
+          })()}
           onSave={handleSaveCrop}
           onCancel={() => setCroppingImage(null)}
         />
@@ -1056,11 +1058,17 @@ export function AdminProducts() {
           aspectRatio={1}
           outputWidth={800}
           outputHeight={800}
-          initialCrop={{
-            x: croppingDisplayImage.crop_x ?? undefined,
-            y: croppingDisplayImage.crop_y ?? undefined,
-            zoom: croppingDisplayImage.crop_zoom ?? undefined,
-          }}
+          initialCrop={
+            typeof croppingDisplayImage.crop_x === "number" &&
+            typeof croppingDisplayImage.crop_y === "number" &&
+            typeof croppingDisplayImage.crop_zoom === "number"
+              ? {
+                  x: croppingDisplayImage.crop_x,
+                  y: croppingDisplayImage.crop_y,
+                  zoom: croppingDisplayImage.crop_zoom,
+                }
+              : null
+          }
           onSave={handleSaveDisplayCrop}
           onCancel={() => setCroppingDisplayImage(null)}
         />

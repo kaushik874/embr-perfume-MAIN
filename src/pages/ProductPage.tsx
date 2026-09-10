@@ -250,7 +250,7 @@ function ProductInfo({
     : "0.0";
   const reviewCount = reviews.length;
 
-  const isOutOfStock = selectedVariant ? selectedVariant.stock <= 0 : product.stock <= 0;
+  const isOutOfStock = selectedVariant ? selectedVariant.stock <= 0 : (product.stock ?? 1) <= 0;
 
   return (
     <SectionShell className="lg:mt-0" noMargin={true}>

@@ -75,6 +75,7 @@ export type Product = {
   description: string | null;
   price: number;
   mrp: number;
+  stock?: number;
   image: string | null;
   featured: number;
   collection_type?: "primary" | "secondary";
