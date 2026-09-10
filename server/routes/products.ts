@@ -15,7 +15,7 @@ router.get("/", async (_req, res) => {
 
   const variants = await db
     .prepare(
-      `SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order
+      `SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order, image
        FROM product_variants
        WHERE is_active = 1
        ORDER BY sort_order ASC, id ASC`
@@ -55,7 +55,7 @@ router.get("/:slug", async (req, res) => {
 
   const variants = await db
     .prepare(
-      "SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order FROM product_variants WHERE product_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC"
+      "SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order, image FROM product_variants WHERE product_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC"
     )
     .all((product as any).id);
 

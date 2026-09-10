@@ -73,6 +73,7 @@ export type ProductFull = {
     stock: number;
     is_active: number;
     sort_order: number;
+    image?: string | null;
   }[];
 };
 
@@ -98,6 +99,11 @@ export const adminApi = {
     request<{ ok: boolean }>(`/products/${id}/variants`, {
       method: "PUT",
       body: JSON.stringify({ variants }),
+    }),
+  uploadVariantImage: (body: { data: string; name?: string }) =>
+    request<{ url: string }>("/products/variant-image", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
   updateProductShipping: (id: number, shippingCharge: number) =>
     request<{ ok: boolean }>(`/products/${id}/shipping`, {

@@ -62,6 +62,7 @@ interface VariantFormItem {
   stock: number;
   is_active: number;
   sort_order: number;
+  image?: string | null;
 }
 
 type ProductImageItem = {
@@ -84,6 +85,7 @@ const emptyForm: ProductForm = {
 export function AdminProducts() {
   const [products, setProducts] = useState<ProductFull[]>([]);
   const [variants, setVariants] = useState<VariantFormItem[]>([]);
+  const [uploadingVariantIdx, setUploadingVariantIdx] = useState<number | null>(null);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -286,6 +288,7 @@ export function AdminProducts() {
           stock: v.stock,
           is_active: v.is_active ?? 1,
           sort_order: v.sort_order ?? 0,
+          image: v.image || null,
         }))
       );
       setShowForm(true);
@@ -304,6 +307,7 @@ export function AdminProducts() {
         stock: 10,
         is_active: 1,
         sort_order: prev.length,
+        image: null,
       },
     ]);
   };
@@ -330,6 +334,20 @@ export function AdminProducts() {
       next[target] = temp;
       return next;
     });
+  };
+
+  const handleVariantImageUpload = async (index: number, file: File) => {
+    setUploadingVariantIdx(index);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const res = await adminApi.uploadVariantImage({ data: dataUrl, name: file.name });
+      updateVariant(index, "image", res.url);
+      toast.success("Variant image uploaded");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload variant image");
+    } finally {
+      setUploadingVariantIdx(null);
+    }
   };
 
   const handleSave = async () => {
@@ -368,6 +386,7 @@ export function AdminProducts() {
           variants.map((v, idx) => ({
             ...v,
             sort_order: idx,
+            image: v.image || null,
           }))
         );
       }
@@ -759,6 +778,61 @@ export function AdminProducts() {
                           {variant.stock <= 0 && (
                             <span className="text-[10px] text-red-500 font-medium">Out of Stock</span>
                           )}
+                        </div>
+
+                        {/* Variant Image */}
+                        <div className="mt-3 pt-2.5 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {variant.image ? (
+                              <div className="w-11 h-11 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+                                <img
+                                  src={variant.image}
+                                  alt={variant.name || `Variant ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-11 h-11 rounded-md border border-dashed border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800/50 flex flex-col items-center justify-center text-gray-400 flex-shrink-0">
+                                <Upload className="w-3.5 h-3.5" />
+                                <span className="text-[8px] mt-0.5 leading-none">No img</span>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 block">
+                                Variant Image
+                              </span>
+                              <span className="text-[10px] text-gray-400">
+                                {variant.image ? "Custom image set" : "Uses product default if empty"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                              <Upload className="w-3 h-3" />
+                              {uploadingVariantIdx === idx ? "Uploading..." : variant.image ? "Replace" : "Upload"}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingVariantIdx === idx}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleVariantImageUpload(idx, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                            {variant.image && (
+                              <button
+                                type="button"
+                                onClick={() => updateVariant(idx, "image", null)}
+                                className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}

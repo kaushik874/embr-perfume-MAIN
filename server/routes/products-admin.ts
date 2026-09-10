@@ -523,10 +523,26 @@ const variantInputSchema = z.object({
   stock: z.number().int().nonnegative().default(0),
   is_active: z.number().int().min(0).max(1).default(1),
   sort_order: z.number().int().default(0),
+  image: z.string().optional().nullable().default(null),
 });
 
 const saveVariantsSchema = z.object({
   variants: z.array(variantInputSchema),
+});
+
+router.post("/products/variant-image", async (req, res) => {
+  const { data } = req.body;
+  if (!data) {
+    res.status(400).json({ error: "No image data provided" });
+    return;
+  }
+  try {
+    const url = await uploadToCloudinary(data, "products/variants");
+    res.json({ url });
+  } catch (err: any) {
+    console.error("Variant image upload failed:", err);
+    res.status(500).json({ error: err.message || "Failed to upload image" });
+  }
 });
 
 router.put("/products/:id/variants", async (req, res) => {
@@ -565,14 +581,15 @@ router.put("/products/:id/variants", async (req, res) => {
             compare_price = ?,
             stock = ?,
             is_active = ?,
-            sort_order = ?
+            sort_order = ?,
+            image = ?
           WHERE id = ? AND product_id = ?
-        `).run(v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, v.id, productId);
+        `).run(v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, v.image ?? null, v.id, productId);
       } else {
         const result = await db.prepare(`
-          INSERT INTO product_variants (product_id, name, price, compare_price, stock, is_active, sort_order)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(productId, v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder);
+          INSERT INTO product_variants (product_id, name, price, compare_price, stock, is_active, sort_order, image)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(productId, v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, v.image ?? null);
         if (result.lastInsertRowid) {
           submittedIds.add(Number(result.lastInsertRowid));
         }

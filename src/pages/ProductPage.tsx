@@ -20,7 +20,7 @@ type SectionRenderContext = {
   galleryImages: string[];
   mainImage: string;
   selectedImage: string | null;
-  setSelectedImage: (url: string) => void;
+  setSelectedImage: (url: string | null) => void;
   quantity: number;
   setQuantity: (value: number) => void;
   relatedProducts: Product[];
@@ -225,6 +225,7 @@ function ProductInfo({
   activeVariants,
   selectedVariant,
   setSelectedVariantId,
+  setSelectedImage,
   currentPrice,
   currentMrp,
 }: SectionRenderContext) {
@@ -325,7 +326,10 @@ function ProductInfo({
                   <button
                     key={variant.id}
                     type="button"
-                    onClick={() => setSelectedVariantId(variant.id)}
+                    onClick={() => {
+                      setSelectedVariantId(variant.id);
+                      setSelectedImage(null);
+                    }}
                     disabled={variantOutOfStock}
                     className={`rounded-md px-5 py-2.5 text-xs sm:text-sm font-semibold uppercase tracking-wider transition-all ${
                       isSelected
@@ -614,13 +618,16 @@ export function ProductPage() {
   const currentMrp = selectedVariant && selectedVariant.compare_price ? selectedVariant.compare_price : (product?.mrp ?? 0);
   const discount = currentMrp > currentPrice ? Math.round((1 - currentPrice / currentMrp) * 100) : 0;
 
+  const variantImage = selectedVariant?.image || null;
+
   const galleryImages = useMemo(() => {
     const ordered = images.map((img) => img.url).filter(Boolean);
     if (ordered.length > 0) return ordered;
     return product?.image ? [product.image] : [];
   }, [images, product?.image]);
 
-  const mainImage = selectedImage ?? galleryImages[0] ?? "/images/bottle-mini.svg";
+  const defaultImage = galleryImages[0] ?? product?.image ?? "/images/bottle-mini.svg";
+  const mainImage = selectedImage ?? variantImage ?? defaultImage;
 
   useEffect(() => {
     if (!product) return;
