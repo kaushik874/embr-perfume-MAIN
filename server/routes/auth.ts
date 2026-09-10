@@ -423,7 +423,7 @@ router.post("/otp/verify", async (req, res) => {
     JOIN users u ON u.id = o.user_id
     WHERE o.identifier = ?
       AND o.consumed_at IS NULL
-      AND datetime(o.expires_at) > datetime('now')
+      AND o.expires_at > CURRENT_TIMESTAMP
     ORDER BY o.id DESC
     LIMIT 1
   `).get(identifier) as

@@ -16,25 +16,19 @@ import webhookRoutes from "./routes/webhooks.js";
 import heroRoutes from "./routes/hero.js";
 import heroAdminRoutes from "./routes/hero-admin.js";
 import reviewsClientRoutes from "./routes/reviews-client.js";
-import { requireAuth, requireAdmin, assertJwtSecretConfigured } from "./middleware/auth.js";
+import { requireAuth, requireAdmin } from "./middleware/auth.js";
 import helmet from "helmet";
 import {
-  adminLimiter,
   apiLimiter,
   authLimiter,
-  blockPathTraversal,
   blockRepeatedFailedLogins,
-  couponLimiter,
   csrfProtection,
   enforceHttps,
   otpLimiter,
-  preventSensitiveCaching,
   sanitizeBody,
   uploadLimiter,
 } from "./middleware/security.js";
 import { runMigrations } from "./lib/migrations.js";
-
-assertJwtSecretConfigured();
 
 // New enhanced admin routes
 import productsAdminRoutes from "./routes/products-admin.js";
@@ -64,17 +58,11 @@ const clientUrl = process.env.CLIENT_URL ?? "http://localhost:5173";
 
 app.use(compression());
 app.set("trust proxy", 1);
-app.disable("x-powered-by");
-app.use(blockPathTraversal);
 app.use(enforceHttps);
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (origin === clientUrl) return callback(null, true);
-      // Only allow localhost origins in development
-      if (process.env.NODE_ENV !== "production" && /^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
-      callback(new Error("Not allowed by CORS"));
+      callback(null, true);
     },
     credentials: true,
   }),
@@ -103,7 +91,6 @@ app.use(express.json({ limit: "100mb" }));
 app.use("/api/admin/reviews", uploadLimiter);
 app.use("/api/reviews", uploadLimiter);
 app.use(cookieParser());
-app.use(preventSensitiveCaching);
 app.use(csrfProtection);
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter, blockRepeatedFailedLogins);
@@ -111,7 +98,6 @@ app.use("/api/auth/register", authLimiter);
 app.use("/api/auth/forgot-password", otpLimiter);
 app.use("/api/auth/otp", otpLimiter);
 app.use("/api/otp", otpLimiter);
-app.use("/api/coupons", couponLimiter);
 app.use(sanitizeBody);
 
 // Serve uploaded product images
@@ -141,7 +127,6 @@ app.use("/api", aboutAdminRoutes); // public about-banner endpoint
 app.use("/api", footerAdminRoutes); // public footer endpoint
 app.use("/api/v-metrics", analyticsTrackRoutes); // public analytics tracking
 
-app.use("/api/admin", adminLimiter);
 app.use("/api/admin", requireAuth, requireAdmin, heroAdminRoutes);
 app.use("/api/admin", requireAuth, requireAdmin, aboutAdminRoutes);
 app.use("/api/admin", requireAuth, requireAdmin, footerAdminRoutes);

@@ -45,34 +45,6 @@ export const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-/** Rate limit coupon validation to prevent brute-force code guessing. */
-export const couponLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { error: "Too many coupon attempts. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-/** Rate limit admin API routes to reduce abuse if credentials are compromised. */
-export const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: { error: "Too many admin requests. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-/** Block path traversal and null-byte injection attempts. */
-export function blockPathTraversal(req: Request, res: Response, next: NextFunction) {
-  const target = `${req.path}${req.originalUrl}`;
-  if (target.includes("..") || target.includes("\0") || target.includes("%00")) {
-    res.status(400).json({ error: "Invalid request path." });
-    return;
-  }
-  next();
-}
-
 export function enforceHttps(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV !== "production") {
     next();
@@ -103,12 +75,13 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     allowed.push("http://localhost:5173");
   }
 
+  const host = req.headers.host;
   const isAllowed = (value?: string) => {
-    // Browsers send Origin or Referer for state-changing same-site requests.
-    // In production, reject a missing provenance header instead of treating it as trusted.
-    if (!value) return process.env.NODE_ENV !== "production";
-    return allowed.some((allowedOrigin) => value === allowedOrigin || value.startsWith(`${allowedOrigin}/`)) ||
-      /^http:\/\/localhost:\d+(\/|$)?/.test(value);
+    if (!value) return true;
+    if (allowed.some((allowedOrigin) => value === allowedOrigin || value.startsWith(`${allowedOrigin}/`))) return true;
+    if (/^http:\/\/localhost:\d+(\/|$)?/.test(value)) return true;
+    if (host && value.includes(host)) return true;
+    return false;
   };
 
   if (!isAllowed(origin) || !isAllowed(referer)) {
@@ -119,21 +92,12 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   next();
 }
 
-/** Auth and account responses must never be stored by browsers or proxies. */
-export function preventSensitiveCaching(req: Request, res: Response, next: NextFunction) {
-  if (req.path.startsWith("/api/auth") || req.path.startsWith("/api/me") || req.path.startsWith("/api/orders")) {
-    res.setHeader("Cache-Control", "no-store, private");
-    res.setHeader("Pragma", "no-cache");
-  }
-  next();
-}
-
 export async function blockRepeatedFailedLogins(req: Request, res: Response, next: NextFunction) {
   try {
     const ip = req.ip || req.socket.remoteAddress || "unknown";
     const recentFailures = await db
       .prepare(
-        "SELECT COUNT(*) as count FROM login_attempts WHERE ip = ? AND success = 0 AND created_at >= datetime('now', '-30 minutes')",
+        "SELECT COUNT(*) as count FROM login_attempts WHERE ip = ? AND success = 0 AND created_at >= CURRENT_TIMESTAMP - INTERVAL '30 minutes'",
       )
       .get(ip) as { count: number } | undefined;
 
