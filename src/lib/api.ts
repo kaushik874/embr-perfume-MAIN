@@ -56,6 +56,17 @@ async function request<T>(
 
 export type User = { id: number; name: string; email: string; phone?: string | null; role?: string };
 
+export type ProductVariant = {
+  id: number;
+  product_id: number;
+  name: string;
+  price: number;
+  compare_price?: number | null;
+  stock: number;
+  is_active: number;
+  sort_order: number;
+};
+
 export type Product = {
   id: number;
   slug: string;
@@ -79,6 +90,8 @@ export type Product = {
   display_crop_x?: number | null;
   display_crop_y?: number | null;
   display_crop_zoom?: number | null;
+  variant_selector_heading?: string | null;
+  variants?: ProductVariant[];
 };
 
 export type HeroBanner = {
@@ -138,6 +151,8 @@ export type Order = {
     name: string;
     slug: string;
     image: string | null;
+    variant_id?: number | null;
+    variant_name?: string | null;
   }[];
 };
 
@@ -259,11 +274,11 @@ export const api = {
 
   product: async (slug: string) => {
     try {
-      return await request<{ product: Product; images?: { url: string }[] }>(`/products/${slug}`);
+      return await request<{ product: Product; images?: { url: string }[]; variants?: ProductVariant[] }>(`/products/${slug}`);
     } catch (err) {
       const cached = getCatalogProduct(slug);
       if (cached) {
-        return { product: cached, images: cached.image ? [{ url: cached.image }] : [] };
+        return { product: cached, images: cached.image ? [{ url: cached.image }] : [], variants: cached.variants || [] };
       }
       throw err;
     }
@@ -292,7 +307,7 @@ export const api = {
     request<{ ok: boolean }>(`/me/addresses/${id}/default`, { method: "POST" }),
 
   guestCheckout: (body: {
-    items: { slug: string; quantity: number }[];
+    items: { slug: string; productId?: number; variantId?: number; quantity: number }[];
     checkoutSessionId?: string;
     couponCode?: string;
     shipping: {
@@ -380,7 +395,7 @@ export const api = {
   },
   validateCoupon: (body: {
     code: string;
-    items: { slug: string; quantity: number }[];
+    items: { slug: string; productId?: number; variantId?: number; quantity: number }[];
   }) =>
     request<{
       valid: boolean;

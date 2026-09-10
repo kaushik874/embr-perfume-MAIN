@@ -64,7 +64,8 @@ export function FeatureBanner() {
               type="button"
               onClick={() => {
                 if (featured) {
-                  add(featured);
+                  const defaultVariant = featured.variants?.find((v) => v.is_active === 1);
+                  add(featured, 1, defaultVariant);
                   toast.success(`${featured.name} added to bag`);
                 }
               }}

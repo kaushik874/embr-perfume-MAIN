@@ -61,6 +61,7 @@ const productSchema = z.object({
   heart_notes: z.string().optional().nullable().default(null),
   base_notes: z.string().optional().nullable().default(null),
   review: z.string().optional().nullable().default(null),
+  variant_selector_heading: z.string().max(100).optional().nullable().default("SELECT ONE"),
 });
 
 function sanitizeFilename(name: string): string {
@@ -164,7 +165,10 @@ router.get("/products/:id", async (req, res) => {
   const images = await db.prepare(
     "SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC"
   ).all(req.params.id);
-  res.json({ product, images });
+  const variants = await db.prepare(
+    "SELECT * FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC"
+  ).all(req.params.id);
+  res.json({ product, images, variants });
 });
 
 router.post("/products", async (req, res) => {
@@ -175,8 +179,8 @@ router.post("/products", async (req, res) => {
   }
   try {
     const result = await db.prepare(`
-      INSERT INTO products (slug, name, notes, description, price, mrp, discount_price, stock, sku, category, status, tags, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review)
-      VALUES (@slug, @name, @notes, @description, @price, @mrp, @discount_price, @stock, @sku, @category, @status, @tags, @image, 0, @collection_type, @bestseller, @key_features, @how_to_apply, @legal_information, @head_notes, @heart_notes, @base_notes, @review)
+      INSERT INTO products (slug, name, notes, description, price, mrp, discount_price, stock, sku, category, status, tags, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review, variant_selector_heading)
+      VALUES (@slug, @name, @notes, @description, @price, @mrp, @discount_price, @stock, @sku, @category, @status, @tags, @image, 0, @collection_type, @bestseller, @key_features, @how_to_apply, @legal_information, @head_notes, @heart_notes, @base_notes, @review, @variant_selector_heading)
     `).run(parsed.data);
     const id = Number(result.lastInsertRowid);
     logAdminAction(req.user!.userId, "create_product", `Created product #${id}: ${parsed.data.name}`);
@@ -199,7 +203,8 @@ router.put("/products/:id", async (req, res) => {
       stock = @stock, sku = @sku, category = @category, status = @status,
       tags = @tags, collection_type = @collection_type, bestseller = @bestseller,
       key_features = @key_features, how_to_apply = @how_to_apply, legal_information = @legal_information,
-      head_notes = @head_notes, heart_notes = @heart_notes, base_notes = @base_notes, review = @review
+      head_notes = @head_notes, heart_notes = @heart_notes, base_notes = @base_notes, review = @review,
+      variant_selector_heading = @variant_selector_heading
     WHERE id = @id
   `).run({ ...parsed.data, id: req.params.id });
 
@@ -214,6 +219,7 @@ router.put("/products/:id", async (req, res) => {
 router.delete("/products/:id", async (req, res) => {
   try {
     await db.prepare("DELETE FROM product_images WHERE product_id = ?").run(req.params.id);
+    await db.prepare("DELETE FROM product_variants WHERE product_id = ?").run(req.params.id);
     const result = await db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
     if (result.changes === 0) {
       res.status(404).json({ error: "Product not found" });
@@ -506,6 +512,81 @@ router.patch("/products/:id/shipping", async (req, res) => {
     return;
   }
   logAdminAction(req.user!.userId, "update_shipping", `Updated shipping charge for product #${req.params.id} to ₹${parsed.data.shipping_charge}`);
+  res.json({ ok: true });
+});
+
+const variantInputSchema = z.object({
+  id: z.number().int().positive().optional(),
+  name: z.string().min(1).max(100),
+  price: z.number().int().nonnegative(),
+  compare_price: z.number().int().nonnegative().optional().nullable().default(null),
+  stock: z.number().int().nonnegative().default(0),
+  is_active: z.number().int().min(0).max(1).default(1),
+  sort_order: z.number().int().default(0),
+});
+
+const saveVariantsSchema = z.object({
+  variants: z.array(variantInputSchema),
+});
+
+router.put("/products/:id/variants", async (req, res) => {
+  const parsed = saveVariantsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const productId = req.params.id;
+  const product = await db.prepare("SELECT id FROM products WHERE id = ?").get(productId);
+  if (!product) {
+    res.status(404).json({ error: "Product not found" });
+    return;
+  }
+
+  const { variants } = parsed.data;
+
+  await db.transaction(async () => {
+    const existing = await db
+      .prepare("SELECT id FROM product_variants WHERE product_id = ?")
+      .all(productId) as { id: number }[];
+    const existingIds = new Set(existing.map((e) => e.id));
+    const submittedIds = new Set<number>();
+
+    for (let i = 0; i < variants.length; i++) {
+      const v = variants[i];
+      const sortOrder = v.sort_order ?? i;
+
+      if (v.id && existingIds.has(v.id)) {
+        submittedIds.add(v.id);
+        await db.prepare(`
+          UPDATE product_variants SET
+            name = ?,
+            price = ?,
+            compare_price = ?,
+            stock = ?,
+            is_active = ?,
+            sort_order = ?
+          WHERE id = ? AND product_id = ?
+        `).run(v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, v.id, productId);
+      } else {
+        const result = await db.prepare(`
+          INSERT INTO product_variants (product_id, name, price, compare_price, stock, is_active, sort_order)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(productId, v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder);
+        if (result.lastInsertRowid) {
+          submittedIds.add(Number(result.lastInsertRowid));
+        }
+      }
+    }
+
+    for (const ex of existing) {
+      if (!submittedIds.has(ex.id)) {
+        await db.prepare("DELETE FROM product_variants WHERE id = ? AND product_id = ?").run(ex.id, productId);
+      }
+    }
+  })();
+
+  logAdminAction(req.user!.userId, "update_variants", `Updated variants for product #${productId}`);
   res.json({ ok: true });
 });
 

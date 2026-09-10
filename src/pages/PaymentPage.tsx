@@ -137,7 +137,13 @@ export function PaymentPage() {
   const [couponError, setCouponError] = useState<string | null>(null);
 
   const orderItems = useMemo(
-    () => items.map((i) => ({ slug: i.product.slug, quantity: i.quantity })),
+    () =>
+      items.map((i) => ({
+        slug: i.product.slug,
+        productId: i.product.id,
+        variantId: i.variant?.id ?? undefined,
+        quantity: i.quantity,
+      })),
     [items],
   );
 
@@ -514,23 +520,30 @@ export function PaymentPage() {
               <h2 className="font-display text-sm tracking-[0.3em] text-gold-deep">ORDER SUMMARY</h2>
             </div>
             <ul className="mt-5 space-y-4 text-sm text-ink">
-              {items.map((i) => (
-                <li key={i.product.slug} className="flex gap-3">
-                  <img
-                    src={i.product.image ?? "/images/bottle-mini.svg"}
-                    alt={i.product.name}
-                    className="h-16 w-12 shrink-0 object-contain"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/images/bottle-mini.svg";
-                    }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{i.product.name}</p>
-                    <p className="text-xs text-ink-muted">Qty {i.quantity}</p>
-                  </div>
-                  <span className="font-display text-gold-deep">₹{i.product.price * i.quantity}</span>
-                </li>
-              ))}
+              {items.map((i) => {
+                const itemKey = i.variant?.id ? `${i.product.slug}:v${i.variant.id}` : i.product.slug;
+                const itemPrice = i.variant ? i.variant.price : i.product.price;
+                return (
+                  <li key={itemKey} className="flex gap-3">
+                    <img
+                      src={i.product.image ?? "/images/bottle-mini.svg"}
+                      alt={i.product.name}
+                      className="h-16 w-12 shrink-0 object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/images/bottle-mini.svg";
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{i.product.name}</p>
+                      {i.variant && (
+                        <p className="text-xs font-medium text-ink-muted">Option: {i.variant.name}</p>
+                      )}
+                      <p className="text-xs text-ink-muted">Qty {i.quantity}</p>
+                    </div>
+                    <span className="font-display text-gold-deep">₹{itemPrice * i.quantity}</span>
+                  </li>
+                );
+              })}
             </ul>
 
             <div className="mt-5 border-t border-border-light pt-4">

@@ -51,6 +51,17 @@ interface ProductForm {
   heart_notes: string;
   base_notes: string;
   review: string;
+  variant_selector_heading: string;
+}
+
+interface VariantFormItem {
+  id?: number;
+  name: string;
+  price: number;
+  compare_price: number | null;
+  stock: number;
+  is_active: number;
+  sort_order: number;
 }
 
 type ProductImageItem = {
@@ -66,11 +77,13 @@ type ProductImageItem = {
 const emptyForm: ProductForm = {
   slug: "", name: "", notes: "", description: "", price: 0, mrp: 0,
   discount_price: null, stock: 0, sku: "", category: "", status: "draft", tags: "", collection_type: "secondary", bestseller: false,
-  key_features: "", how_to_apply: "", legal_information: "", head_notes: "", heart_notes: "", base_notes: "", review: ""
+  key_features: "", how_to_apply: "", legal_information: "", head_notes: "", heart_notes: "", base_notes: "", review: "",
+  variant_selector_heading: "SELECT ONE"
 };
 
 export function AdminProducts() {
   const [products, setProducts] = useState<ProductFull[]>([]);
+  const [variants, setVariants] = useState<VariantFormItem[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -231,6 +244,7 @@ export function AdminProducts() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setVariants([]);
     setShowForm(true);
   };
 
@@ -261,11 +275,61 @@ export function AdminProducts() {
         heart_notes: p.heart_notes || "",
         base_notes: p.base_notes || "",
         review: p.review || "",
+        variant_selector_heading: p.variant_selector_heading || "SELECT ONE",
       });
+      setVariants(
+        (res.variants || []).map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          price: v.price,
+          compare_price: v.compare_price ?? null,
+          stock: v.stock,
+          is_active: v.is_active ?? 1,
+          sort_order: v.sort_order ?? 0,
+        }))
+      );
       setShowForm(true);
     } catch (err: any) {
       toast.error(err.message);
     }
+  };
+
+  const addVariant = () => {
+    setVariants((prev) => [
+      ...prev,
+      {
+        name: "",
+        price: form.price || 0,
+        compare_price: form.mrp || null,
+        stock: 10,
+        is_active: 1,
+        sort_order: prev.length,
+      },
+    ]);
+  };
+
+  const updateVariant = (index: number, field: keyof VariantFormItem, value: any) => {
+    setVariants((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const removeVariant = (index: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const moveVariant = (index: number, direction: -1 | 1) => {
+    setVariants((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const temp = next[index];
+      next[index] = next[target];
+      next[target] = temp;
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -287,14 +351,28 @@ export function AdminProducts() {
         heart_notes: form.heart_notes || null,
         base_notes: form.base_notes || null,
         review: form.review || null,
+        variant_selector_heading: form.variant_selector_heading || "SELECT ONE",
       };
+
+      let productId = editingId;
       if (editingId) {
         await adminApi.updateProduct(editingId, body);
-        toast.success("Product updated");
       } else {
-        await adminApi.createProduct(body);
-        toast.success("Product created");
+        const createRes = await adminApi.createProduct(body);
+        productId = createRes.id;
       }
+
+      if (productId) {
+        await adminApi.updateVariants(
+          productId,
+          variants.map((v, idx) => ({
+            ...v,
+            sort_order: idx,
+          }))
+        );
+      }
+
+      toast.success(editingId ? "Product updated" : "Product created");
       setShowForm(false);
       fetchProducts();
     } catch (err: any) {
@@ -537,6 +615,155 @@ export function AdminProducts() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Featured Review</label>
                 <textarea value={form.review} onChange={(e) => setForm({ ...form, review: e.target.value })} rows={3}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white" />
+              </div>
+
+              {/* Variants / Options Section */}
+              <div className="sm:col-span-2 border-t border-gray-200 dark:border-gray-800 pt-6 mt-2">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      Variants & Options
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Configure product sizes, volumes or options with independent pricing and stock.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    className="bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-black text-xs font-semibold px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    + Add Variant
+                  </button>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Selector Heading (e.g. SELECT ONE, CHOOSE SIZE)
+                  </label>
+                  <input
+                    value={form.variant_selector_heading}
+                    onChange={(e) => setForm({ ...form, variant_selector_heading: e.target.value })}
+                    placeholder="SELECT ONE"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                {variants.length === 0 ? (
+                  <div className="border border-dashed border-gray-200 dark:border-gray-800 rounded-lg p-5 text-center text-xs text-gray-400">
+                    No variants added. Product will use the standard base price and stock configured above.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {variants.map((variant, idx) => (
+                      <div
+                        key={idx}
+                        className="border border-gray-200 dark:border-gray-800 rounded-lg p-3.5 bg-gray-50 dark:bg-gray-900/40"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                            Option #{idx + 1}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => moveVariant(idx, -1)}
+                              disabled={idx === 0}
+                              className="text-[10px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              ↑ Up
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveVariant(idx, 1)}
+                              disabled={idx === variants.length - 1}
+                              className="text-[10px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              ↓ Down
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(idx)}
+                              className="text-red-500 hover:text-red-700 p-1 rounded"
+                              title="Delete variant"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                          <div className="col-span-2 sm:col-span-2">
+                            <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-0.5">
+                              Variant Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={variant.name}
+                              onChange={(e) => updateVariant(idx, "name", e.target.value)}
+                              placeholder="e.g. 10ml, 30ml, 50ml"
+                              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-0.5">
+                              Price (₹) *
+                            </label>
+                            <input
+                              type="number"
+                              value={variant.price || ""}
+                              onChange={(e) => updateVariant(idx, "price", parseInt(e.target.value) || 0)}
+                              placeholder="149"
+                              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-0.5">
+                              Compare (MRP ₹)
+                            </label>
+                            <input
+                              type="number"
+                              value={variant.compare_price || ""}
+                              onChange={(e) => updateVariant(idx, "compare_price", parseInt(e.target.value) || null)}
+                              placeholder="299"
+                              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-0.5">
+                              Stock
+                            </label>
+                            <input
+                              type="number"
+                              value={variant.stock}
+                              onChange={(e) => updateVariant(idx, "stock", parseInt(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between pt-1">
+                          <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={variant.is_active === 1}
+                              onChange={(e) => updateVariant(idx, "is_active", e.target.checked ? 1 : 0)}
+                              className="rounded border-gray-300"
+                            />
+                            Active (Visible to customers)
+                          </label>
+                          {variant.stock <= 0 && (
+                            <span className="text-[10px] text-red-500 font-medium">Out of Stock</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-8">

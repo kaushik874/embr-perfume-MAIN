@@ -15,6 +15,7 @@ const validateSchema = z.object({
     z.object({
       slug: z.string().min(1).optional(),
       productId: z.number().int().positive().optional(),
+      variantId: z.number().int().positive().optional(),
       quantity: z.number().int().min(1).max(10),
     }).refine((item) => item.productId || item.slug, {
       message: "Each item needs productId or slug",

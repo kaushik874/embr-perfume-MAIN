@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
-import { api, type Product } from "@/lib/api";
+import { api, type Product, type ProductVariant } from "@/lib/api";
 import { getCatalogProduct } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -26,6 +26,11 @@ type SectionRenderContext = {
   relatedProducts: Product[];
   discount: number;
   noteList: string[];
+  activeVariants: ProductVariant[];
+  selectedVariant: ProductVariant | null;
+  setSelectedVariantId: (id: number) => void;
+  currentPrice: number;
+  currentMrp: number;
 };
 
 function formatPrice(value: number) {
@@ -217,7 +222,12 @@ function ProductInfo({
   setQuantity,
   discount,
   noteList,
-  }: SectionRenderContext) {
+  activeVariants,
+  selectedVariant,
+  setSelectedVariantId,
+  currentPrice,
+  currentMrp,
+}: SectionRenderContext) {
   const { add } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
   const category =
@@ -239,6 +249,8 @@ function ProductInfo({
     ? (reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length).toFixed(1)
     : "0.0";
   const reviewCount = reviews.length;
+
+  const isOutOfStock = selectedVariant ? selectedVariant.stock <= 0 : product.stock <= 0;
 
   return (
     <SectionShell className="lg:mt-0" noMargin={true}>
@@ -267,10 +279,10 @@ function ProductInfo({
         </div>
 
         <div className="mt-7 flex flex-wrap items-end gap-3">
-          <span className="text-4xl font-semibold text-ink">{formatPrice(product.price)}</span>
-          {product.mrp > product.price ? (
+          <span className="text-4xl font-semibold text-ink">{formatPrice(currentPrice)}</span>
+          {currentMrp > currentPrice ? (
             <span className="pb-1 text-base text-ink-muted line-through">
-              {formatPrice(product.mrp)}
+              {formatPrice(currentMrp)}
             </span>
           ) : null}
           {discount > 0 ? (
@@ -297,6 +309,38 @@ function ProductInfo({
                 {note}
               </span>
             ))}
+          </div>
+        ) : null}
+
+        {activeVariants && activeVariants.length > 0 ? (
+          <div className="mt-7">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-ink-muted">
+              {product.variant_selector_heading || "SELECT ONE"}
+            </p>
+            <div className="flex flex-wrap gap-2.5 sm:gap-3">
+              {activeVariants.map((variant) => {
+                const isSelected = selectedVariant?.id === variant.id;
+                const variantOutOfStock = variant.stock <= 0;
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    onClick={() => setSelectedVariantId(variant.id)}
+                    disabled={variantOutOfStock}
+                    className={`rounded-md px-5 py-2.5 text-xs sm:text-sm font-semibold uppercase tracking-wider transition-all ${
+                      isSelected
+                        ? "border-2 border-ink bg-ink text-white shadow-sm"
+                        : variantOutOfStock
+                        ? "border border-border-light/60 bg-gray-100 text-ink-muted/50 cursor-not-allowed line-through"
+                        : "border border-border-light bg-white text-ink hover:border-ink/60"
+                    }`}
+                  >
+                    {variant.name}
+                    {variantOutOfStock && <span className="ml-1.5 text-[10px] lowercase no-underline">(out of stock)</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : null}
 
@@ -330,13 +374,24 @@ function ProductInfo({
 
           <button
             type="button"
+            disabled={isOutOfStock}
             onClick={() => {
-              add(product, quantity);
-              toast.success(`${product.name} added to cart`);
+              add(product, quantity, selectedVariant);
+              toast.success(
+                selectedVariant
+                  ? `${product.name} (${selectedVariant.name}) added to cart`
+                  : `${product.name} added to cart`
+              );
             }}
-            className="h-[var(--button-height)] w-[var(--button-width)] bg-ink px-8 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-gold-deep sm:flex-1"
+            className={`h-[var(--button-height)] w-[var(--button-width)] px-8 text-sm font-bold uppercase tracking-wide transition-colors sm:flex-1 ${
+              isOutOfStock
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-ink text-white hover:bg-gold-deep"
+            }`}
           >
-            {productPageSettings.text.addToCart} - {formatPrice(product.price * quantity)}
+            {isOutOfStock
+              ? "OUT OF STOCK"
+              : `${productPageSettings.text.addToCart} - ${formatPrice(currentPrice * quantity)}`}
           </button>
         </div>
       </div>
@@ -513,6 +568,7 @@ export function ProductPage() {
   const slug = params?.slug ?? "";
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
 
   const cachedProduct = getCatalogProduct(slug);
 
@@ -524,6 +580,7 @@ export function ProductPage() {
       ? () => ({
           product: cachedProduct,
           images: cachedProduct.image ? [{ url: cachedProduct.image }] : [],
+          variants: cachedProduct.variants || [],
         })
       : undefined,
   });
@@ -535,6 +592,27 @@ export function ProductPage() {
 
   const product = data?.product ?? null;
   const images = data?.images ?? [];
+  const variants = data?.variants ?? product?.variants ?? [];
+  const activeVariants = useMemo(() => (variants || []).filter((v) => v.is_active !== 0), [variants]);
+
+  useEffect(() => {
+    if (activeVariants.length > 0) {
+      if (!selectedVariantId || !activeVariants.some((v) => v.id === selectedVariantId)) {
+        setSelectedVariantId(activeVariants[0].id);
+      }
+    } else {
+      setSelectedVariantId(null);
+    }
+  }, [activeVariants, selectedVariantId]);
+
+  const selectedVariant = useMemo(
+    () => activeVariants.find((v) => v.id === selectedVariantId) ?? (activeVariants.length > 0 ? activeVariants[0] : null),
+    [activeVariants, selectedVariantId],
+  );
+
+  const currentPrice = selectedVariant ? selectedVariant.price : (product?.price ?? 0);
+  const currentMrp = selectedVariant && selectedVariant.compare_price ? selectedVariant.compare_price : (product?.mrp ?? 0);
+  const discount = currentMrp > currentPrice ? Math.round((1 - currentPrice / currentMrp) * 100) : 0;
 
   const galleryImages = useMemo(() => {
     const ordered = images.map((img) => img.url).filter(Boolean);
@@ -573,10 +651,10 @@ export function ProductPage() {
       image: mainImage,
       offers: {
         "@type": "Offer",
-        price: product.price,
+        price: currentPrice,
         priceCurrency: "INR",
         availability:
-          ((product as Product & { stock?: number }).stock ?? 1) > 0
+          (selectedVariant ? selectedVariant.stock : ((product as Product & { stock?: number }).stock ?? 1)) > 0
             ? "https://schema.org/InStock"
             : "https://schema.org/OutOfStock",
       },
@@ -586,7 +664,7 @@ export function ProductPage() {
       document.title = "Embr Parfums";
       script.remove();
     };
-  }, [product, mainImage]);
+  }, [product, mainImage, currentPrice, selectedVariant]);
 
   if (!product) {
     if (isLoading) {
@@ -611,7 +689,6 @@ export function ProductPage() {
     );
   }
 
-  const discount = product.mrp > product.price ? Math.round((1 - product.price / product.mrp) * 100) : 0;
   const noteList = splitNotes(product.notes);
   const relatedProducts =
     productsData?.products
@@ -629,6 +706,11 @@ export function ProductPage() {
     relatedProducts,
     discount,
     noteList,
+    activeVariants,
+    selectedVariant,
+    setSelectedVariantId,
+    currentPrice,
+    currentMrp,
   };
 
   const style = {

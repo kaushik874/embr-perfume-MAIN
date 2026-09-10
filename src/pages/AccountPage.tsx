@@ -201,7 +201,12 @@ export function AccountPage() {
                                 <div key={idx} className="flex items-center gap-3 bg-cream-light p-2 rounded border border-border-light">
                                   {item.image && <img src={item.image} alt={item.name} className="w-12 h-12 rounded object-cover" />}
                                   <div className="flex-1">
-                                    <p className="text-sm font-medium text-ink">{item.name}</p>
+                                    <p className="text-sm font-medium text-ink">
+                                      {item.name}
+                                      {item.variant_name && (
+                                        <span className="ml-1 text-xs text-ink-muted">({item.variant_name})</span>
+                                      )}
+                                    </p>
                                     <p className="text-xs text-ink-muted">Qty: {item.quantity}</p>
                                   </div>
                                   {(order.status === "paid" || order.status === "delivered") && (

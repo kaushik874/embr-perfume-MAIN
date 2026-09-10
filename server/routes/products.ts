@@ -6,12 +6,32 @@ const router = Router();
 router.get("/", async (_req, res) => {
   const products = await db
     .prepare(
-      `SELECT id, slug, name, notes, description, price, mrp, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review
+      `SELECT id, slug, name, notes, description, price, mrp, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review, variant_selector_heading
        FROM products
        WHERE status = 'published'
        ORDER BY featured DESC, name ASC`,
     )
-    .all();
+    .all() as any[];
+
+  const variants = await db
+    .prepare(
+      `SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order
+       FROM product_variants
+       WHERE is_active = 1
+       ORDER BY sort_order ASC, id ASC`
+    )
+    .all() as any[];
+
+  const variantsByProductId = new Map<number, any[]>();
+  for (const v of variants) {
+    const list = variantsByProductId.get(v.product_id) || [];
+    list.push(v);
+    variantsByProductId.set(v.product_id, list);
+  }
+
+  for (const p of products) {
+    p.variants = variantsByProductId.get(p.id) || [];
+  }
 
   res.json({ products });
 });
@@ -19,7 +39,7 @@ router.get("/", async (_req, res) => {
 router.get("/:slug", async (req, res) => {
   const product = await db
     .prepare(
-      `SELECT id, slug, name, notes, description, price, mrp, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review
+      `SELECT id, slug, name, notes, description, price, mrp, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review, variant_selector_heading
        FROM products WHERE slug = ? AND status = 'published'`,
     )
     .get(req.params.slug);
@@ -33,7 +53,15 @@ router.get("/:slug", async (req, res) => {
     .prepare("SELECT url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC")
     .all((product as any).id);
 
-  res.json({ product, images });
+  const variants = await db
+    .prepare(
+      "SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order FROM product_variants WHERE product_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC"
+    )
+    .all((product as any).id);
+
+  (product as any).variants = variants;
+
+  res.json({ product, images, variants });
 });
 
 export default router;

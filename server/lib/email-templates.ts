@@ -140,7 +140,7 @@ export function orderConfirmationEmail(order: any, items: any[]) {
   const itemsHtml = items.map(item => `
     <tr>
       <td>
-        <strong>${item.name || item.product_name}</strong><br>
+        <strong>${item.name || item.product_name}${item.variant_name || item.variantName ? ` (${item.variant_name || item.variantName})` : ''}</strong><br>
         <span style="color: #666; font-size: 13px;">Qty: ${item.quantity}</span>
       </td>
       <td style="text-align: right;">INR ${(item.price_at_time || item.price_paise) / 100}</td>

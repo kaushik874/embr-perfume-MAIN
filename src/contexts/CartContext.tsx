@@ -7,10 +7,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, type Product } from "@/lib/api";
+import { api, type Product, type ProductVariant } from "@/lib/api";
 
 export type CartItem = {
   product: Product;
+  variant?: ProductVariant | null;
   quantity: number;
 };
 
@@ -18,9 +19,9 @@ type CartContextValue = {
   items: CartItem[];
   count: number;
   total: number;
-  add: (product: Product, qty?: number) => void;
-  remove: (productSlug: string) => void;
-  setQuantity: (productSlug: string, quantity: number) => void;
+  add: (product: Product, qty?: number, variant?: ProductVariant | null) => void;
+  remove: (productSlug: string, variantId?: number | null) => void;
+  setQuantity: (productSlug: string, quantity: number, variantId?: number | null) => void;
   clear: () => void;
   syncProducts: () => Promise<void>;
 };
@@ -47,18 +48,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const add = useCallback(
-    (product: Product, qty = 1) => {
+    (product: Product, qty = 1, variant?: ProductVariant | null) => {
       setItems((prev) => {
-        const existing = prev.find((i) => i.product.slug === product.slug);
+        const vId = variant?.id ?? null;
+        const existing = prev.find(
+          (i) => i.product.slug === product.slug && (i.variant?.id ?? null) === vId,
+        );
         let next: CartItem[];
         if (existing) {
           next = prev.map((i) =>
-            i.product.slug === product.slug
+            i.product.slug === product.slug && (i.variant?.id ?? null) === vId
               ? { ...i, quantity: Math.min(10, i.quantity + qty) }
               : i,
           );
         } else {
-          next = [...prev, { product, quantity: qty }];
+          next = [...prev, { product, variant: variant ?? null, quantity: qty }];
         }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return next;
@@ -67,23 +71,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const remove = useCallback((productSlug: string) => {
+  const remove = useCallback((productSlug: string, variantId?: number | null) => {
     setItems((prev) => {
-      const next = prev.filter((i) => i.product.slug !== productSlug);
+      const vId = variantId ?? null;
+      const next = prev.filter(
+        (i) => !(i.product.slug === productSlug && (i.variant?.id ?? null) === vId),
+      );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }, []);
 
   const setQuantity = useCallback(
-    (productSlug: string, quantity: number) => {
+    (productSlug: string, quantity: number, variantId?: number | null) => {
       if (quantity < 1) {
-        remove(productSlug);
+        remove(productSlug, variantId);
         return;
       }
       setItems((prev) => {
+        const vId = variantId ?? null;
         const next = prev.map((i) =>
-          i.product.slug === productSlug
+          i.product.slug === productSlug && (i.variant?.id ?? null) === vId
             ? { ...i, quantity: Math.min(10, quantity) }
             : i,
         );
@@ -103,7 +111,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (prev.length === 0) return prev;
         const next = prev.map((item) => {
           const fresh = products.find((p) => p.slug === item.product.slug);
-          return fresh ? { ...item, product: fresh } : item;
+          if (!fresh) return item;
+          let freshVariant = item.variant;
+          if (item.variant && fresh.variants) {
+            const matchedVariant = fresh.variants.find((v) => v.id === item.variant?.id);
+            if (matchedVariant) {
+              freshVariant = matchedVariant;
+            }
+          }
+          return { ...item, product: fresh, variant: freshVariant };
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return next;
@@ -125,7 +141,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const total = useMemo(
-    () => items.reduce((s, i) => s + i.product.price * i.quantity, 0),
+    () =>
+      items.reduce((s, i) => {
+        const price = i.variant ? i.variant.price : i.product.price;
+        return s + price * i.quantity;
+      }, 0),
     [items],
   );
 

@@ -26,6 +26,7 @@ const itemSchema = z
   .object({
     productId: z.number().int().positive().optional(),
     slug: z.string().min(1).optional(),
+    variantId: z.number().int().positive().optional(),
     quantity: z.number().int().min(1).max(10),
   })
   .refine((item) => item.productId || item.slug, {
@@ -145,7 +146,7 @@ router.get("/mine", requireAuth, async (req, res) => {
   for (const order of orders) {
     order.items = await db
       .prepare(
-        `SELECT oi.quantity, oi.price_paise as price_at_time, p.name, p.slug, p.image
+        `SELECT oi.quantity, oi.price_paise as price_at_time, oi.variant_id, oi.variant_name, p.name, p.slug, p.image
          FROM order_items oi
          JOIN products p ON oi.product_id = p.id
          WHERE oi.order_id = ?`

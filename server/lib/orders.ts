@@ -3,7 +3,7 @@ import { formatAddress, type CheckoutAddressInput } from "./addresses.js";
 import { razorpayEnabled, reconcilePendingRazorpayOrders } from "./payments.js";
 import { releaseCouponUsage } from "./pricing.js";
 
-export type LineItemInput = { productId?: number; slug?: string; quantity: number };
+export type LineItemInput = { productId?: number; slug?: string; variantId?: number; quantity: number };
 
 export async function buildOrderLines(items: LineItemInput[]) {
   const getById = db.prepare(
@@ -12,10 +12,15 @@ export async function buildOrderLines(items: LineItemInput[]) {
   const getBySlug = db.prepare(
     "SELECT id, name, price, stock FROM products WHERE slug = ?",
   );
+  const getVariantById = db.prepare(
+    "SELECT id, product_id, name, price, stock, is_active FROM product_variants WHERE id = ?",
+  );
 
   let totalPaise = 0;
   const lineItems: {
     productId: number;
+    variantId?: number;
+    variantName?: string;
     quantity: number;
     pricePaise: number;
     name: string;
@@ -35,14 +40,49 @@ export async function buildOrderLines(items: LineItemInput[]) {
       throw new Error(`Product ${ref} not found`);
     }
 
-    if (product.stock < item.quantity) {
-      throw new Error(`Insufficient stock for ${product.name} (only ${product.stock} left)`);
+    let pricePaise = product.price * 100;
+    let variantId: number | undefined;
+    let variantName: string | undefined;
+
+    if (item.variantId) {
+      const variant = await getVariantById.get(item.variantId) as {
+        id: number;
+        product_id: number;
+        name: string;
+        price: number;
+        stock: number;
+        is_active: number;
+      } | undefined;
+
+      if (!variant) {
+        throw new Error(`Variant not found for ${product.name}`);
+      }
+      if (variant.product_id !== product.id) {
+        throw new Error(`Variant does not belong to ${product.name}`);
+      }
+      if (variant.is_active !== 1) {
+        throw new Error(`Variant ${variant.name} is currently unavailable`);
+      }
+      if (variant.stock < item.quantity) {
+        throw new Error(
+          `Insufficient stock for ${product.name} (${variant.name}) (only ${variant.stock} left)`
+        );
+      }
+
+      pricePaise = variant.price * 100;
+      variantId = variant.id;
+      variantName = variant.name;
+    } else {
+      if (product.stock < item.quantity) {
+        throw new Error(`Insufficient stock for ${product.name} (only ${product.stock} left)`);
+      }
     }
 
-    const pricePaise = product.price * 100;
     totalPaise += pricePaise * item.quantity;
     lineItems.push({
       productId: product.id,
+      variantId,
+      variantName,
       quantity: item.quantity,
       pricePaise,
       name: product.name,
@@ -66,6 +106,8 @@ export async function createOrderRecord(
   totalPaise: number,
   lineItems: {
     productId: number;
+    variantId?: number;
+    variantName?: string;
     quantity: number;
     pricePaise: number;
   }[],
@@ -88,12 +130,16 @@ export async function createOrderRecord(
   `);
 
   const insertItem = db.prepare(`
-    INSERT INTO order_items (order_id, product_id, quantity, price_paise)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO order_items (order_id, product_id, variant_id, variant_name, quantity, price_paise)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
 
-  const decrementStock = db.prepare(
+  const decrementProductStock = db.prepare(
     "UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?"
+  );
+
+  const decrementVariantStock = db.prepare(
+    "UPDATE product_variants SET stock = MAX(0, stock - ?) WHERE id = ?"
   );
 
   return db.transaction(async () => {
@@ -128,10 +174,16 @@ export async function createOrderRecord(
       await insertItem.run(
         orderId,
         line.productId,
+        line.variantId ?? null,
+        line.variantName ?? null,
         line.quantity,
         line.pricePaise,
       );
-      await decrementStock.run(line.quantity, line.productId);
+      if (line.variantId) {
+        await decrementVariantStock.run(line.quantity, line.variantId);
+      } else {
+        await decrementProductStock.run(line.quantity, line.productId);
+      }
     }
 
     return orderId;
@@ -156,11 +208,14 @@ export function startOrderExpiryJob() {
 
       if (expiredOrders.length === 0) return;
 
-      const restoreStock = db.prepare(
+      const restoreProductStock = db.prepare(
         "UPDATE products SET stock = stock + ? WHERE id = ?"
       );
+      const restoreVariantStock = db.prepare(
+        "UPDATE product_variants SET stock = stock + ? WHERE id = ?"
+      );
       const getItems = db.prepare(
-        "SELECT product_id, quantity FROM order_items WHERE order_id = ?"
+        "SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = ?"
       );
       const cancelOrder = db.prepare(
         "UPDATE orders SET status = 'cancelled' WHERE id = ?"
@@ -168,9 +223,13 @@ export function startOrderExpiryJob() {
 
       await db.transaction(async () => {
         for (const order of expiredOrders) {
-          const items = await getItems.all(order.id) as { product_id: number; quantity: number }[];
+          const items = await getItems.all(order.id) as { product_id: number; variant_id: number | null; quantity: number }[];
           for (const item of items) {
-            await restoreStock.run(item.quantity, item.product_id);
+            if (item.variant_id) {
+              await restoreVariantStock.run(item.quantity, item.variant_id);
+            } else {
+              await restoreProductStock.run(item.quantity, item.product_id);
+            }
           }
           await cancelOrder.run(order.id);
           await releaseCouponUsage(order.id);

@@ -392,7 +392,12 @@ export function AdminOrders() {
                 <tbody>
                   {selectedItems.map((item: any, i: number) => (
                     <tr key={i} className="border-b border-gray-100 dark:border-gray-800/50">
-                      <td className="py-2">{item.name}</td>
+                      <td className="py-2">
+                        {item.name}
+                        {item.variant_name && (
+                          <span className="ml-1 text-xs text-gray-500 font-medium">({item.variant_name})</span>
+                        )}
+                      </td>
                       <td className="py-2 text-right">{item.quantity}</td>
                       <td className="py-2 text-right">₹{(item.price_paise / 100).toFixed(2)}</td>
                       <td className="py-2 text-right font-medium">₹{((item.price_paise * item.quantity) / 100).toFixed(2)}</td>

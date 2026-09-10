@@ -11,6 +11,11 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
   const eager = index < 3;
   const saving = product.mrp - product.price;
 
+  const hasVariants = Boolean(product.variants && product.variants.length > 0);
+  const minPrice = hasVariants
+    ? Math.min(...product.variants!.map((v) => v.price))
+    : product.price;
+
   return (
     <article
       className="reveal group relative flex flex-col overflow-hidden rounded-lg border border-border-light bg-white p-2.5 md:p-8 transition-all duration-500 md:hover:-translate-y-2 md:hover:border-gold-deep/40 md:hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.08)]"
@@ -43,7 +48,9 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           <p className="mt-1 text-[11px] text-emerald-600 md:hidden">(Saving ₹{saving})</p>
         )}
         <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5 md:mt-3 md:gap-3">
-          <span className="text-base font-semibold text-ink md:font-display md:text-xl md:font-normal md:text-2xl md:text-gold-deep">₹{product.price}</span>
+          <span className="text-base font-semibold text-ink md:font-display md:text-xl md:font-normal md:text-2xl md:text-gold-deep">
+            {hasVariants ? `From ₹${minPrice}` : `₹${product.price}`}
+          </span>
           <span className="text-[11px] text-ink-muted/60 line-through md:text-sm">₹{product.mrp}</span>
         </div>
         <p className="mt-3 hidden text-xs tracking-widest text-gold-deep opacity-0 transition-opacity group-hover:opacity-100 md:block">
@@ -51,18 +58,28 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
         </p>
       </Link>
 
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          add(product);
-          toast.success(`${product.name} added to bag`);
-        }}
-        className="mt-2 w-full rounded-md bg-ink py-2.5 text-center text-[11px] font-semibold tracking-wide text-white md:absolute md:inset-x-0 md:bottom-0 md:mt-0 md:translate-y-full md:rounded-none md:py-4 md:text-center md:text-sm md:font-medium md:tracking-widest md:transition-transform md:duration-500 md:group-hover:translate-y-0"
-      >
-        <span className="md:hidden">Add To Cart</span>
-        <span className="hidden md:inline">ADD TO BAG</span>
-      </button>
+      {hasVariants ? (
+        <Link
+          href={`/product/${product.slug}`}
+          className="mt-2 block w-full rounded-md bg-ink py-2.5 text-center text-[11px] font-semibold tracking-wide text-white md:absolute md:inset-x-0 md:bottom-0 md:mt-0 md:translate-y-full md:rounded-none md:py-4 md:text-center md:text-sm md:font-medium md:tracking-widest md:transition-transform md:duration-500 md:group-hover:translate-y-0"
+        >
+          <span className="md:hidden">Select Option</span>
+          <span className="hidden md:inline">SELECT OPTION</span>
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            add(product);
+            toast.success(`${product.name} added to bag`);
+          }}
+          className="mt-2 w-full rounded-md bg-ink py-2.5 text-center text-[11px] font-semibold tracking-wide text-white md:absolute md:inset-x-0 md:bottom-0 md:mt-0 md:translate-y-full md:rounded-none md:py-4 md:text-center md:text-sm md:font-medium md:tracking-widest md:transition-transform md:duration-500 md:group-hover:translate-y-0"
+        >
+          <span className="md:hidden">Add To Cart</span>
+          <span className="hidden md:inline">ADD TO BAG</span>
+        </button>
+      )}
     </article>
   );
 }

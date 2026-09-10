@@ -198,12 +198,17 @@ async function sendOrderPaidEmail(orderId: number) {
 
 async function reserveStockAgainForRecoveredOrder(orderId: number) {
   const items = await db
-    .prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?")
-    .all(orderId) as { product_id: number; quantity: number }[];
-  const decrementStock = db.prepare("UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?");
+    .prepare("SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = ?")
+    .all(orderId) as { product_id: number; variant_id: number | null; quantity: number }[];
+  const decrementProductStock = db.prepare("UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?");
+  const decrementVariantStock = db.prepare("UPDATE product_variants SET stock = MAX(0, stock - ?) WHERE id = ?");
 
   for (const item of items) {
-    await decrementStock.run(item.quantity, item.product_id);
+    if (item.variant_id) {
+      await decrementVariantStock.run(item.quantity, item.variant_id);
+    } else {
+      await decrementProductStock.run(item.quantity, item.product_id);
+    }
   }
 }
 

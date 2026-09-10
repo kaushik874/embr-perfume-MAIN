@@ -37,66 +37,76 @@ export function CartPage() {
         </h1>
 
         <ul className="mt-10 divide-y divide-border-light">
-          {items.map(({ product, quantity }) => (
-            <li key={product.slug} className="flex gap-4 py-6 sm:gap-5">
-              <Link href={`/product/${product.slug}`} className="shrink-0">
-                <img
-                  src={product.image ?? "/images/bottle-mini.svg"}
-                  alt={product.name}
-                  className="h-24 w-16 object-contain transition-opacity hover:opacity-80 sm:h-28 sm:w-20"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/images/bottle-mini.svg";
-                  }}
-                />
-              </Link>
-              <div className="flex min-w-0 flex-1 flex-col justify-between">
-                <div className="min-w-0">
-                  <Link href={`/product/${product.slug}`}>
-                    <h2 className="font-serif text-lg text-ink hover:text-gold-deep sm:text-xl">
-                      {product.name}
-                    </h2>
-                  </Link>
-                  <p className="text-xs tracking-widest text-ink-muted uppercase">
-                    {product.notes}
-                  </p>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-3 justify-between sm:mt-0">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      aria-label="Decrease quantity"
-                      onClick={() => setQuantity(product.slug, quantity - 1)}
-                      className="rounded-full border border-border-light p-1.5 hover:border-gold-deep"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="w-8 text-center font-medium">{quantity}</span>
-                    <button
-                      type="button"
-                      aria-label="Increase quantity"
-                      onClick={() => setQuantity(product.slug, quantity + 1)}
-                      className="rounded-full border border-border-light p-1.5 hover:border-gold-deep"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
+          {items.map(({ product, variant, quantity }) => {
+            const itemKey = variant?.id ? `${product.slug}:v${variant.id}` : product.slug;
+            const itemPrice = variant ? variant.price : product.price;
+
+            return (
+              <li key={itemKey} className="flex gap-4 py-6 sm:gap-5">
+                <Link href={`/product/${product.slug}`} className="shrink-0">
+                  <img
+                    src={product.image ?? "/images/bottle-mini.svg"}
+                    alt={product.name}
+                    className="h-24 w-16 object-contain transition-opacity hover:opacity-80 sm:h-28 sm:w-20"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/images/bottle-mini.svg";
+                    }}
+                  />
+                </Link>
+                <div className="flex min-w-0 flex-1 flex-col justify-between">
+                  <div className="min-w-0">
+                    <Link href={`/product/${product.slug}`}>
+                      <h2 className="font-serif text-lg text-ink hover:text-gold-deep sm:text-xl">
+                        {product.name}
+                      </h2>
+                    </Link>
+                    {variant ? (
+                      <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-ink">
+                        Option: <span className="font-normal text-ink-muted">{variant.name}</span>
+                      </p>
+                    ) : null}
+                    <p className="text-xs tracking-widest text-ink-muted uppercase">
+                      {product.notes}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-display text-xl text-gold-deep">
-                      ₹{product.price * quantity}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="Remove"
-                      onClick={() => remove(product.slug)}
-                      className="text-ink-muted hover:text-rose-deep"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 justify-between sm:mt-0">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label="Decrease quantity"
+                        onClick={() => setQuantity(product.slug, quantity - 1, variant?.id)}
+                        className="rounded-full border border-border-light p-1.5 hover:border-gold-deep"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="w-8 text-center font-medium">{quantity}</span>
+                      <button
+                        type="button"
+                        aria-label="Increase quantity"
+                        onClick={() => setQuantity(product.slug, quantity + 1, variant?.id)}
+                        className="rounded-full border border-border-light p-1.5 hover:border-gold-deep"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="font-display text-xl text-gold-deep">
+                        ₹{itemPrice * quantity}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Remove"
+                        onClick={() => remove(product.slug, variant?.id)}
+                        className="text-ink-muted hover:text-rose-deep"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
 
         <div className="mt-8 flex items-center justify-between border-t border-border-light pt-8">

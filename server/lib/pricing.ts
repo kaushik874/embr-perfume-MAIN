@@ -6,6 +6,8 @@ export type PricingLineItem = {
   pricePaise: number;
   shippingChargePaise: number;
   name: string;
+  variantId?: number;
+  variantName?: string;
 };
 
 export type CouponRecord = {
@@ -35,7 +37,7 @@ export type PricingResult = {
   coupon: CouponRecord | null;
 };
 
-export type LineItemInput = { productId?: number; slug?: string; quantity: number };
+export type LineItemInput = { productId?: number; slug?: string; variantId?: number; quantity: number };
 
 /**
  * Validates a coupon code and returns the coupon record if valid.
@@ -137,6 +139,9 @@ export async function calculateOrderPricing(
   const getBySlug = db.prepare(
     "SELECT id, name, price, stock, shipping_charge FROM products WHERE slug = ?",
   );
+  const getVariantById = db.prepare(
+    "SELECT id, product_id, name, price, stock, is_active FROM product_variants WHERE id = ?",
+  );
 
   let subtotalPaise = 0;
   const lineItems: PricingLineItem[] = [];
@@ -163,13 +168,46 @@ export async function calculateOrderPricing(
       throw new Error(`Product ${ref} not found`);
     }
 
-    if (product.stock < item.quantity) {
-      throw new Error(
-        `Insufficient stock for ${product.name} (only ${product.stock} left)`
-      );
+    let pricePaise = product.price * 100;
+    let variantId: number | undefined;
+    let variantName: string | undefined;
+
+    if (item.variantId) {
+      const variant = await getVariantById.get(item.variantId) as {
+        id: number;
+        product_id: number;
+        name: string;
+        price: number;
+        stock: number;
+        is_active: number;
+      } | undefined;
+
+      if (!variant) {
+        throw new Error(`Variant not found for ${product.name}`);
+      }
+      if (variant.product_id !== product.id) {
+        throw new Error(`Variant does not belong to ${product.name}`);
+      }
+      if (variant.is_active !== 1) {
+        throw new Error(`Variant ${variant.name} is currently unavailable`);
+      }
+      if (variant.stock < item.quantity) {
+        throw new Error(
+          `Insufficient stock for ${product.name} (${variant.name}) (only ${variant.stock} left)`
+        );
+      }
+
+      pricePaise = variant.price * 100;
+      variantId = variant.id;
+      variantName = variant.name;
+    } else {
+      if (product.stock < item.quantity) {
+        throw new Error(
+          `Insufficient stock for ${product.name} (only ${product.stock} left)`
+        );
+      }
     }
 
-    const pricePaise = product.price * 100;
     const shippingChargePaise = (product.shipping_charge ?? 0) * 100;
     subtotalPaise += pricePaise * item.quantity;
 
@@ -185,6 +223,8 @@ export async function calculateOrderPricing(
       pricePaise,
       shippingChargePaise,
       name: product.name,
+      variantId,
+      variantName,
     });
   }
 

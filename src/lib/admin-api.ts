@@ -63,6 +63,17 @@ export type ProductFull = {
   display_crop_y?: number | null;
   display_crop_zoom?: number | null;
   shipping_charge?: number;
+  variant_selector_heading?: string | null;
+  variants?: {
+    id?: number;
+    product_id?: number;
+    name: string;
+    price: number;
+    compare_price?: number | null;
+    stock: number;
+    is_active: number;
+    sort_order: number;
+  }[];
 };
 
 export type Pagination = {
@@ -78,11 +89,16 @@ export const adminApi = {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
     return request<{ products: ProductFull[]; pagination: Pagination }>(`/products${qs}`);
   },
-  product: (id: number) => request<{ product: ProductFull; images: any[] }>(`/products/${id}`),
+  product: (id: number) => request<{ product: ProductFull; images: any[]; variants?: any[] }>(`/products/${id}`),
   createProduct: (body: any) => request<{ id: number }>("/products", { method: "POST", body: JSON.stringify(body) }),
   updateProduct: (id: number, body: any) => request<{ ok: boolean }>(`/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteProduct: (id: number) => request<{ ok: boolean }>(`/products/${id}`, { method: "DELETE" }),
   updateStock: (id: number, stock: number) => request<{ ok: boolean }>(`/products/${id}/stock`, { method: "PATCH", body: JSON.stringify({ stock }) }),
+  updateVariants: (id: number, variants: any[]) =>
+    request<{ ok: boolean }>(`/products/${id}/variants`, {
+      method: "PUT",
+      body: JSON.stringify({ variants }),
+    }),
   updateProductShipping: (id: number, shippingCharge: number) =>
     request<{ ok: boolean }>(`/products/${id}/shipping`, {
       method: "PATCH",
