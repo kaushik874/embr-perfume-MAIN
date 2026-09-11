@@ -618,16 +618,25 @@ export function ProductPage() {
   const currentMrp = selectedVariant && selectedVariant.compare_price ? selectedVariant.compare_price : (product?.mrp ?? 0);
   const discount = currentMrp > currentPrice ? Math.round((1 - currentPrice / currentMrp) * 100) : 0;
 
-  const variantImage = selectedVariant?.image || null;
+  const variantImages = useMemo(() => {
+    if (selectedVariant?.images && selectedVariant.images.length > 0) {
+      return selectedVariant.images;
+    }
+    if (selectedVariant?.image) {
+      return [selectedVariant.image];
+    }
+    return null;
+  }, [selectedVariant]);
 
-  const galleryImages = useMemo(() => {
+  const defaultGalleryImages = useMemo(() => {
     const ordered = images.map((img) => img.url).filter(Boolean);
     if (ordered.length > 0) return ordered;
     return product?.image ? [product.image] : [];
   }, [images, product?.image]);
 
+  const galleryImages = variantImages ?? defaultGalleryImages;
   const defaultImage = galleryImages[0] ?? product?.image ?? "/images/bottle-mini.svg";
-  const mainImage = selectedImage ?? variantImage ?? defaultImage;
+  const mainImage = selectedImage ?? defaultImage;
 
   useEffect(() => {
     if (!product) return;

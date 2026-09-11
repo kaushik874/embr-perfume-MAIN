@@ -165,9 +165,22 @@ router.get("/products/:id", async (req, res) => {
   const images = await db.prepare(
     "SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC"
   ).all(req.params.id);
-  const variants = await db.prepare(
+  const variants = (await db.prepare(
     "SELECT * FROM product_variants WHERE product_id = ? ORDER BY sort_order ASC, id ASC"
-  ).all(req.params.id);
+  ).all(req.params.id) as any[]).map((v) => {
+    let imagesList: string[] = [];
+    try {
+      imagesList = v.images ? JSON.parse(v.images) : [];
+    } catch {}
+    if (!imagesList.length && v.image) {
+      imagesList = [v.image];
+    }
+    return {
+      ...v,
+      images: imagesList,
+      image: imagesList[0] || v.image || null,
+    };
+  });
   res.json({ product, images, variants });
 });
 
@@ -524,6 +537,7 @@ const variantInputSchema = z.object({
   is_active: z.number().int().min(0).max(1).default(1),
   sort_order: z.number().int().default(0),
   image: z.string().optional().nullable().default(null),
+  images: z.array(z.string()).max(12).optional().default([]),
 });
 
 const saveVariantsSchema = z.object({
@@ -571,6 +585,11 @@ router.put("/products/:id/variants", async (req, res) => {
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
       const sortOrder = v.sort_order ?? i;
+      const imagesList = (Array.isArray(v.images) && v.images.length > 0)
+        ? v.images.slice(0, 12)
+        : (v.image ? [v.image] : []);
+      const primaryImage = imagesList[0] || v.image || null;
+      const imagesJson = JSON.stringify(imagesList);
 
       if (v.id && existingIds.has(v.id)) {
         submittedIds.add(v.id);
@@ -582,14 +601,15 @@ router.put("/products/:id/variants", async (req, res) => {
             stock = ?,
             is_active = ?,
             sort_order = ?,
-            image = ?
+            image = ?,
+            images = ?
           WHERE id = ? AND product_id = ?
-        `).run(v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, v.image ?? null, v.id, productId);
+        `).run(v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, primaryImage, imagesJson, v.id, productId);
       } else {
         const result = await db.prepare(`
-          INSERT INTO product_variants (product_id, name, price, compare_price, stock, is_active, sort_order, image)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(productId, v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, v.image ?? null);
+          INSERT INTO product_variants (product_id, name, price, compare_price, stock, is_active, sort_order, image, images)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(productId, v.name, v.price, v.compare_price, v.stock, v.is_active, sortOrder, primaryImage, imagesJson);
         if (result.lastInsertRowid) {
           submittedIds.add(Number(result.lastInsertRowid));
         }

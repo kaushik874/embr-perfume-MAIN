@@ -13,9 +13,22 @@ router.get("/", async (_req, res) => {
     )
     .all() as any[];
 
+  function parseVariantImages(v: any) {
+    let list: string[] = [];
+    try {
+      list = v.images ? JSON.parse(v.images) : [];
+    } catch {}
+    if (!list.length && v.image) {
+      list = [v.image];
+    }
+    v.images = list;
+    v.image = list[0] || v.image || null;
+    return v;
+  }
+
   const variants = await db
     .prepare(
-      `SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order, image
+      `SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order, image, images
        FROM product_variants
        WHERE is_active = 1
        ORDER BY sort_order ASC, id ASC`
@@ -23,7 +36,8 @@ router.get("/", async (_req, res) => {
     .all() as any[];
 
   const variantsByProductId = new Map<number, any[]>();
-  for (const v of variants) {
+  for (const rawV of variants) {
+    const v = parseVariantImages(rawV);
     const list = variantsByProductId.get(v.product_id) || [];
     list.push(v);
     variantsByProductId.set(v.product_id, list);
@@ -53,11 +67,24 @@ router.get("/:slug", async (req, res) => {
     .prepare("SELECT url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC")
     .all((product as any).id);
 
-  const variants = await db
+  const rawVariants = await db
     .prepare(
-      "SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order, image FROM product_variants WHERE product_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC"
+      "SELECT id, product_id, name, price, compare_price, stock, is_active, sort_order, image, images FROM product_variants WHERE product_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC"
     )
-    .all((product as any).id);
+    .all((product as any).id) as any[];
+
+  const variants = rawVariants.map((v) => {
+    let list: string[] = [];
+    try {
+      list = v.images ? JSON.parse(v.images) : [];
+    } catch {}
+    if (!list.length && v.image) {
+      list = [v.image];
+    }
+    v.images = list;
+    v.image = list[0] || v.image || null;
+    return v;
+  });
 
   (product as any).variants = variants;
 

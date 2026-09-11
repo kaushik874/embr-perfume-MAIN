@@ -290,6 +290,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
   is_active INTEGER NOT NULL DEFAULT 1,
   sort_order INTEGER NOT NULL DEFAULT 0,
   image TEXT,
+  images TEXT DEFAULT '[]',
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -741,6 +742,10 @@ export async function initDb(options: { seedDefaults?: boolean } = {}) {
   } catch (e) {}
 
   try {
+    await db.exec("ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS images TEXT DEFAULT '[]'");
+  } catch (e) {}
+
+  try {
     await db.exec("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL");
   } catch (e) {}
 
@@ -1007,5 +1012,6 @@ export type ProductVariantRow = {
   is_active: number;
   sort_order: number;
   image?: string | null;
+  images?: string | null;
   created_at: string;
 };

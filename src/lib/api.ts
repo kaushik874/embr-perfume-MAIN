@@ -66,6 +66,7 @@ export type ProductVariant = {
   is_active: number;
   sort_order: number;
   image?: string | null;
+  images?: string[];
 };
 
 export type Product = {

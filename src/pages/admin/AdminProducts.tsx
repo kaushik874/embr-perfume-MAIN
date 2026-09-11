@@ -63,6 +63,7 @@ interface VariantFormItem {
   is_active: number;
   sort_order: number;
   image?: string | null;
+  images?: string[];
 }
 
 type ProductImageItem = {
@@ -280,16 +281,25 @@ export function AdminProducts() {
         variant_selector_heading: p.variant_selector_heading || "SELECT ONE",
       });
       setVariants(
-        (res.variants || []).map((v: any) => ({
-          id: v.id,
-          name: v.name,
-          price: v.price,
-          compare_price: v.compare_price ?? null,
-          stock: v.stock,
-          is_active: v.is_active ?? 1,
-          sort_order: v.sort_order ?? 0,
-          image: v.image || null,
-        }))
+        (res.variants || []).map((v: any) => {
+          let imgs: string[] = [];
+          if (Array.isArray(v.images) && v.images.length > 0) {
+            imgs = v.images;
+          } else if (v.image) {
+            imgs = [v.image];
+          }
+          return {
+            id: v.id,
+            name: v.name,
+            price: v.price,
+            compare_price: v.compare_price ?? null,
+            stock: v.stock,
+            is_active: v.is_active ?? 1,
+            sort_order: v.sort_order ?? 0,
+            image: imgs[0] || v.image || null,
+            images: imgs,
+          };
+        })
       );
       setShowForm(true);
     } catch (err: any) {
@@ -308,6 +318,7 @@ export function AdminProducts() {
         is_active: 1,
         sort_order: prev.length,
         image: null,
+        images: [],
       },
     ]);
   };
@@ -336,18 +347,53 @@ export function AdminProducts() {
     });
   };
 
-  const handleVariantImageUpload = async (index: number, file: File) => {
+  const handleVariantImagesUpload = async (index: number, files: FileList | File[]) => {
+    const currentImages = variants[index]?.images || (variants[index]?.image ? [variants[index].image!] : []);
+    const availableSlots = 12 - currentImages.length;
+    if (availableSlots <= 0) {
+      toast.error("Maximum 12 images allowed per variant");
+      return;
+    }
+
+    const filesToUpload = Array.from(files).slice(0, availableSlots);
     setUploadingVariantIdx(index);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      const res = await adminApi.uploadVariantImage({ data: dataUrl, name: file.name });
-      updateVariant(index, "image", res.url);
-      toast.success("Variant image uploaded");
+      const uploadedUrls: string[] = [];
+      for (const file of filesToUpload) {
+        const dataUrl = await readFileAsDataUrl(file);
+        const res = await adminApi.uploadVariantImage({ data: dataUrl, name: file.name });
+        uploadedUrls.push(res.url);
+      }
+      const updatedImages = [...currentImages, ...uploadedUrls].slice(0, 12);
+      setVariants((prev) => {
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          images: updatedImages,
+          image: updatedImages[0] || null,
+        };
+        return next;
+      });
+      toast.success(`${uploadedUrls.length} variant image(s) uploaded`);
     } catch (err: any) {
-      toast.error(err.message || "Failed to upload variant image");
+      toast.error(err.message || "Failed to upload variant images");
     } finally {
       setUploadingVariantIdx(null);
     }
+  };
+
+  const handleRemoveVariantImage = (variantIndex: number, imageIndex: number) => {
+    setVariants((prev) => {
+      const next = [...prev];
+      const current = next[variantIndex]?.images || [];
+      const updated = current.filter((_, i) => i !== imageIndex);
+      next[variantIndex] = {
+        ...next[variantIndex],
+        images: updated,
+        image: updated[0] || null,
+      };
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -383,11 +429,15 @@ export function AdminProducts() {
       if (productId) {
         await adminApi.updateVariants(
           productId,
-          variants.map((v, idx) => ({
-            ...v,
-            sort_order: idx,
-            image: v.image || null,
-          }))
+          variants.map((v, idx) => {
+            const imgs = (v.images && v.images.length > 0) ? v.images.slice(0, 12) : (v.image ? [v.image] : []);
+            return {
+              ...v,
+              sort_order: idx,
+              images: imgs,
+              image: imgs[0] || v.image || null,
+            };
+          })
         );
       }
 
@@ -780,59 +830,72 @@ export function AdminProducts() {
                           )}
                         </div>
 
-                        {/* Variant Image */}
-                        <div className="mt-3 pt-2.5 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {variant.image ? (
-                              <div className="w-11 h-11 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-                                <img
-                                  src={variant.image}
-                                  alt={variant.name || `Variant ${idx + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-11 h-11 rounded-md border border-dashed border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800/50 flex flex-col items-center justify-center text-gray-400 flex-shrink-0">
-                                <Upload className="w-3.5 h-3.5" />
-                                <span className="text-[8px] mt-0.5 leading-none">No img</span>
-                              </div>
-                            )}
+                        {/* Variant Images (Up to 12) */}
+                        <div className="mt-3 pt-2.5 border-t border-gray-200 dark:border-gray-800">
+                          <div className="flex items-center justify-between mb-2">
                             <div>
                               <span className="text-xs font-medium text-gray-700 dark:text-gray-300 block">
-                                Variant Image
+                                Variant Images ({(variant.images && variant.images.length > 0 ? variant.images.length : (variant.image ? 1 : 0))}/12)
                               </span>
                               <span className="text-[10px] text-gray-400">
-                                {variant.image ? "Custom image set" : "Uses product default if empty"}
+                                First image is primary. Uses product default if empty.
                               </span>
                             </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                              <Upload className="w-3 h-3" />
-                              {uploadingVariantIdx === idx ? "Uploading..." : variant.image ? "Replace" : "Upload"}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                disabled={uploadingVariantIdx === idx}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleVariantImageUpload(idx, file);
-                                  e.target.value = "";
-                                }}
-                              />
-                            </label>
-                            {variant.image && (
-                              <button
-                                type="button"
-                                onClick={() => updateVariant(idx, "image", null)}
-                                className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                              >
-                                Remove
-                              </button>
+                            {(variant.images && variant.images.length > 0 ? variant.images.length : (variant.image ? 1 : 0)) < 12 && (
+                              <label className="cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                <Upload className="w-3 h-3" />
+                                {uploadingVariantIdx === idx ? "Uploading..." : "+ Add Images"}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  className="hidden"
+                                  disabled={uploadingVariantIdx === idx}
+                                  onChange={(e) => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                      handleVariantImagesUpload(idx, e.target.files);
+                                    }
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
                             )}
                           </div>
+
+                          {/* Thumbnails list */}
+                          {((variant.images && variant.images.length > 0) || variant.image) ? (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {(variant.images && variant.images.length > 0 ? variant.images : [variant.image!]).map((imgUrl, imgIdx) => (
+                                <div
+                                  key={imgIdx}
+                                  className="relative group/vimg w-12 h-12 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0"
+                                >
+                                  <img
+                                    src={imgUrl}
+                                    alt={`${variant.name || `Variant ${idx + 1}`} - ${imgIdx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  {imgIdx === 0 && (
+                                    <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-[8px] text-white text-center py-0.5 leading-none">
+                                      Main
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveVariantImage(idx, imgIdx)}
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover/vimg:opacity-100 transition-opacity shadow"
+                                    title="Remove image"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="border border-dashed border-gray-200 dark:border-gray-800 rounded p-2 text-center text-[11px] text-gray-400">
+                              No variant images uploaded yet (up to 12 allowed).
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
