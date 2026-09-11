@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
 import { api, type Product, type ProductVariant } from "@/lib/api";
 import { getCatalogProduct } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
@@ -163,100 +163,88 @@ function RichContent({
 function ProductGallery({
   product,
   galleryImages,
-  mainImage,
   selectedImage,
   setSelectedImage,
 }: SectionRenderContext) {
   const hasThumbnails = galleryImages.length > 1;
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isProgrammaticScroll = useRef(false);
-  const scrollTimeout = useRef<number | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollTimer = useRef<number | null>(null);
 
   // Mouse drag state for desktop
-  const isDown = useRef(false);
+  const isMouseDown = useRef(false);
   const startX = useRef(0);
   const scrollLeftPos = useRef(0);
   const hasDragged = useRef(false);
 
-  const activeIndex = useMemo(() => {
-    const current = selectedImage ?? galleryImages[0];
-    const idx = galleryImages.indexOf(current);
-    return idx >= 0 ? idx : 0;
-  }, [selectedImage, galleryImages]);
-
+  // When galleryImages changes (variant change or new product), reset to first slide
   useEffect(() => {
+    setActiveIndex(0);
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = 0;
+    }
+  }, [galleryImages]);
+
+  const goToIndex = (index: number) => {
     const el = scrollRef.current;
     if (!el) return;
-    const targetLeft = activeIndex * el.clientWidth;
-    if (Math.abs(el.scrollLeft - targetLeft) > 10) {
-      isProgrammaticScroll.current = true;
-      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-      el.scrollTo({ left: targetLeft, behavior: "smooth" });
-      scrollTimeout.current = window.setTimeout(() => {
-        isProgrammaticScroll.current = false;
-      }, 400);
-    }
-  }, [activeIndex]);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (isProgrammaticScroll.current) return;
-    const el = e.currentTarget;
-    if (!el || el.clientWidth === 0) return;
-    const newIdx = Math.round(el.scrollLeft / el.clientWidth);
-    if (newIdx >= 0 && newIdx < galleryImages.length && newIdx !== activeIndex) {
-      if (Math.abs(el.scrollLeft - newIdx * el.clientWidth) < el.clientWidth * 0.35) {
-        setSelectedImage(galleryImages[newIdx]);
-      }
-    }
+    setActiveIndex(index);
+    setSelectedImage(galleryImages[index] || null);
+    el.scrollTo({
+      left: index * el.clientWidth,
+      behavior: "smooth",
+    });
   };
 
-  const handlePrev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (activeIndex > 0) {
-      setSelectedImage(galleryImages[activeIndex - 1]);
-    }
-  };
-
-  const handleNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (activeIndex < galleryImages.length - 1) {
-      setSelectedImage(galleryImages[activeIndex + 1]);
-    }
+  // Debounced scroll listener so gestures run 100% natively on the GPU thread without React re-rendering
+  const handleScroll = () => {
+    if (isMouseDown.current) return;
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = window.setTimeout(() => {
+      const el = scrollRef.current;
+      if (!el || el.clientWidth === 0) return;
+      const idx = Math.round(el.scrollLeft / el.clientWidth);
+      const clamped = Math.max(0, Math.min(galleryImages.length - 1, idx));
+      setActiveIndex(clamped);
+      setSelectedImage(galleryImages[clamped] || null);
+    }, 50);
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
     if (!el) return;
-    isDown.current = true;
+    isMouseDown.current = true;
     hasDragged.current = false;
-    startX.current = e.pageX - el.offsetLeft;
+    startX.current = e.pageX;
     scrollLeftPos.current = el.scrollLeft;
+    el.style.scrollSnapType = "none";
+    el.style.scrollBehavior = "auto";
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDown.current) return;
+    if (!isMouseDown.current) return;
     const el = scrollRef.current;
     if (!el) return;
     e.preventDefault();
-    const x = e.pageX - el.offsetLeft;
-    const walk = x - startX.current;
-    if (Math.abs(walk) > 5) {
+    const delta = e.pageX - startX.current;
+    if (Math.abs(delta) > 5) {
       hasDragged.current = true;
     }
-    el.scrollLeft = scrollLeftPos.current - walk;
+    el.scrollLeft = scrollLeftPos.current - delta;
   };
 
   const handleMouseUpOrLeave = () => {
-    if (!isDown.current) return;
-    isDown.current = false;
+    if (!isMouseDown.current) return;
+    isMouseDown.current = false;
     const el = scrollRef.current;
-    if (!el || el.clientWidth === 0) return;
-    if (hasDragged.current) {
-      const targetIdx = Math.round(el.scrollLeft / el.clientWidth);
-      if (targetIdx >= 0 && targetIdx < galleryImages.length) {
-        setSelectedImage(galleryImages[targetIdx]);
-        el.scrollTo({ left: targetIdx * el.clientWidth, behavior: "smooth" });
-      }
+    if (!el) return;
+    el.style.scrollSnapType = "x mandatory";
+    el.style.scrollBehavior = "smooth";
+    if (hasDragged.current && el.clientWidth > 0) {
+      const targetIdx = Math.max(0, Math.min(galleryImages.length - 1, Math.round(el.scrollLeft / el.clientWidth)));
+      el.scrollTo({ left: targetIdx * el.clientWidth, behavior: "smooth" });
+      setActiveIndex(targetIdx);
+      setSelectedImage(galleryImages[targetIdx] || null);
     }
   };
 
@@ -275,9 +263,9 @@ function ProductGallery({
                 <button
                   key={`${url}-${index}`}
                   type="button"
-                  onClick={() => setSelectedImage(url)}
+                  onClick={() => goToIndex(index)}
                   className={`shrink-0 overflow-hidden rounded-[var(--radius-setting)] border bg-white transition-colors ${
-                    active ? "border-ink shadow-sm" : "border-border-light hover:border-ink/50"
+                    active ? "border-ink shadow-sm ring-1 ring-ink" : "border-border-light hover:border-ink/50"
                   }`}
                   style={{ width: "var(--thumb-size)", height: "var(--thumb-size)" }}
                 >
@@ -294,7 +282,7 @@ function ProductGallery({
         ) : null}
 
         {/* Swipeable / Scrollable Main Image Display */}
-        <div className="order-1 relative aspect-[943/1404] lg:aspect-auto w-full overflow-hidden rounded-[var(--radius-setting)] border border-border-light bg-[#f7f7f5] lg:order-2 lg:min-h-[var(--main-image-height)]">
+        <div className="order-1 relative aspect-[943/1404] lg:aspect-auto w-full overflow-hidden rounded-[var(--radius-setting)] border border-border-light bg-[#f7f7f5] lg:order-2 lg:min-h-[var(--main-image-height)] select-none">
           <div
             ref={scrollRef}
             onScroll={handleScroll}
@@ -302,8 +290,12 @@ function ProductGallery({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUpOrLeave}
             onMouseLeave={handleMouseUpOrLeave}
-            className="flex h-full w-full overflow-x-auto snap-x snap-mandatory scroll-smooth cursor-grab active:cursor-grabbing touch-pan-x"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            className="flex h-full w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain cursor-grab active:cursor-grabbing touch-pan-x"
+            style={{
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+              WebkitOverflowScrolling: "touch",
+            }}
           >
             {galleryImages.map((url, index) => (
               <div
@@ -315,51 +307,28 @@ function ProductGallery({
                   alt={`${product.name} view ${index + 1}`}
                   fetchPriority={index === 0 ? "high" : "auto"}
                   decoding="async"
+                  draggable={false}
                   className="h-full w-full object-cover lg:h-[var(--gallery-image-height)] lg:w-[var(--gallery-image-width)] select-none pointer-events-none"
                 />
               </div>
             ))}
           </div>
 
-          {/* Left / Right Arrow Buttons */}
+          {/* Dots Indicator (Only if multiple images) */}
           {hasThumbnails && (
-            <>
-              {activeIndex > 0 && (
+            <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 backdrop-blur-sm">
+              {galleryImages.map((_, dotIdx) => (
                 <button
+                  key={dotIdx}
                   type="button"
-                  onClick={handlePrev}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur-sm transition-all hover:bg-white hover:scale-105 active:scale-95"
-                  aria-label="Previous image"
-                >
-                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
-              )}
-              {activeIndex < galleryImages.length - 1 && (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur-sm transition-all hover:bg-white hover:scale-105 active:scale-95"
-                  aria-label="Next image"
-                >
-                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
-              )}
-
-              {/* Dots Indicator */}
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 backdrop-blur-sm">
-                {galleryImages.map((_, dotIdx) => (
-                  <button
-                    key={dotIdx}
-                    type="button"
-                    onClick={() => setSelectedImage(galleryImages[dotIdx])}
-                    className={`h-1.5 rounded-full transition-all ${
-                      dotIdx === activeIndex ? "w-4 bg-white" : "w-1.5 bg-white/50 hover:bg-white/75"
-                    }`}
-                    aria-label={`Go to image ${dotIdx + 1}`}
-                  />
-                ))}
-              </div>
-            </>
+                  onClick={() => goToIndex(dotIdx)}
+                  className={`pointer-events-auto h-1.5 rounded-full transition-all duration-300 ${
+                    dotIdx === activeIndex ? "w-4 bg-white" : "w-1.5 bg-white/50 hover:bg-white/75"
+                  }`}
+                  aria-label={`Go to image ${dotIdx + 1}`}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>
