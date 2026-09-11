@@ -1,7 +1,7 @@
-import { useMemo, useState, useEffect, type CSSProperties } from "react";
+import { useMemo, useState, useEffect, useRef, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
-import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
 import { api, type Product, type ProductVariant } from "@/lib/api";
 import { getCatalogProduct } from "@/lib/catalog";
 import { useCart } from "@/contexts/CartContext";
@@ -168,6 +168,97 @@ function ProductGallery({
   setSelectedImage,
 }: SectionRenderContext) {
   const hasThumbnails = galleryImages.length > 1;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScroll = useRef(false);
+  const scrollTimeout = useRef<number | null>(null);
+
+  // Mouse drag state for desktop
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeftPos = useRef(0);
+  const hasDragged = useRef(false);
+
+  const activeIndex = useMemo(() => {
+    const current = selectedImage ?? galleryImages[0];
+    const idx = galleryImages.indexOf(current);
+    return idx >= 0 ? idx : 0;
+  }, [selectedImage, galleryImages]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const targetLeft = activeIndex * el.clientWidth;
+    if (Math.abs(el.scrollLeft - targetLeft) > 10) {
+      isProgrammaticScroll.current = true;
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+      el.scrollTo({ left: targetLeft, behavior: "smooth" });
+      scrollTimeout.current = window.setTimeout(() => {
+        isProgrammaticScroll.current = false;
+      }, 400);
+    }
+  }, [activeIndex]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isProgrammaticScroll.current) return;
+    const el = e.currentTarget;
+    if (!el || el.clientWidth === 0) return;
+    const newIdx = Math.round(el.scrollLeft / el.clientWidth);
+    if (newIdx >= 0 && newIdx < galleryImages.length && newIdx !== activeIndex) {
+      if (Math.abs(el.scrollLeft - newIdx * el.clientWidth) < el.clientWidth * 0.35) {
+        setSelectedImage(galleryImages[newIdx]);
+      }
+    }
+  };
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeIndex > 0) {
+      setSelectedImage(galleryImages[activeIndex - 1]);
+    }
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeIndex < galleryImages.length - 1) {
+      setSelectedImage(galleryImages[activeIndex + 1]);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    isDown.current = true;
+    hasDragged.current = false;
+    startX.current = e.pageX - el.offsetLeft;
+    scrollLeftPos.current = el.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDown.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    e.preventDefault();
+    const x = e.pageX - el.offsetLeft;
+    const walk = x - startX.current;
+    if (Math.abs(walk) > 5) {
+      hasDragged.current = true;
+    }
+    el.scrollLeft = scrollLeftPos.current - walk;
+  };
+
+  const handleMouseUpOrLeave = () => {
+    if (!isDown.current) return;
+    isDown.current = false;
+    const el = scrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    if (hasDragged.current) {
+      const targetIdx = Math.round(el.scrollLeft / el.clientWidth);
+      if (targetIdx >= 0 && targetIdx < galleryImages.length) {
+        setSelectedImage(galleryImages[targetIdx]);
+        el.scrollTo({ left: targetIdx * el.clientWidth, behavior: "smooth" });
+      }
+    }
+  };
 
   return (
     <SectionShell className="lg:mt-0" noMargin={true}>
@@ -179,14 +270,14 @@ function ProductGallery({
         {hasThumbnails ? (
           <div className="order-2 flex gap-3 overflow-x-auto pb-1 lg:order-1 lg:max-h-[var(--main-image-height)] lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:pb-0">
             {galleryImages.map((url, index) => {
-              const active = (selectedImage ?? galleryImages[0]) === url;
+              const active = activeIndex === index;
               return (
                 <button
                   key={`${url}-${index}`}
                   type="button"
                   onClick={() => setSelectedImage(url)}
                   className={`shrink-0 overflow-hidden rounded-[var(--radius-setting)] border bg-white transition-colors ${
-                    active ? "border-ink" : "border-border-light hover:border-ink/50"
+                    active ? "border-ink shadow-sm" : "border-border-light hover:border-ink/50"
                   }`}
                   style={{ width: "var(--thumb-size)", height: "var(--thumb-size)" }}
                 >
@@ -202,14 +293,74 @@ function ProductGallery({
           </div>
         ) : null}
 
-        <div className="order-1 flex aspect-[943/1404] lg:aspect-auto w-full items-center justify-center overflow-hidden rounded-[var(--radius-setting)] border border-border-light bg-[#f7f7f5] lg:order-2 lg:min-h-[var(--main-image-height)]">
-          <img
-            src={mainImage}
-            alt={product.name}
-            fetchPriority="high"
-            decoding="async"
-            className="h-full w-full object-cover lg:h-[var(--gallery-image-height)] lg:w-[var(--gallery-image-width)]"
-          />
+        {/* Swipeable / Scrollable Main Image Display */}
+        <div className="order-1 relative aspect-[943/1404] lg:aspect-auto w-full overflow-hidden rounded-[var(--radius-setting)] border border-border-light bg-[#f7f7f5] lg:order-2 lg:min-h-[var(--main-image-height)]">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseLeave={handleMouseUpOrLeave}
+            className="flex h-full w-full overflow-x-auto snap-x snap-mandatory scroll-smooth cursor-grab active:cursor-grabbing touch-pan-x"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {galleryImages.map((url, index) => (
+              <div
+                key={`${url}-${index}`}
+                className="flex h-full w-full shrink-0 snap-center snap-always items-center justify-center"
+              >
+                <img
+                  src={url}
+                  alt={`${product.name} view ${index + 1}`}
+                  fetchPriority={index === 0 ? "high" : "auto"}
+                  decoding="async"
+                  className="h-full w-full object-cover lg:h-[var(--gallery-image-height)] lg:w-[var(--gallery-image-width)] select-none pointer-events-none"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Left / Right Arrow Buttons */}
+          {hasThumbnails && (
+            <>
+              {activeIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={handlePrev}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur-sm transition-all hover:bg-white hover:scale-105 active:scale-95"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+              )}
+              {activeIndex < galleryImages.length - 1 && (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur-sm transition-all hover:bg-white hover:scale-105 active:scale-95"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+              )}
+
+              {/* Dots Indicator */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1 backdrop-blur-sm">
+                {galleryImages.map((_, dotIdx) => (
+                  <button
+                    key={dotIdx}
+                    type="button"
+                    onClick={() => setSelectedImage(galleryImages[dotIdx])}
+                    className={`h-1.5 rounded-full transition-all ${
+                      dotIdx === activeIndex ? "w-4 bg-white" : "w-1.5 bg-white/50 hover:bg-white/75"
+                    }`}
+                    aria-label={`Go to image ${dotIdx + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </SectionShell>
@@ -580,13 +731,7 @@ export function ProductPage() {
     queryKey: ["product", slug],
     queryFn: () => api.product(slug),
     enabled: Boolean(slug),
-    initialData: cachedProduct
-      ? () => ({
-          product: cachedProduct,
-          images: cachedProduct.image ? [{ url: cachedProduct.image }] : [],
-          variants: cachedProduct.variants || [],
-        })
-      : undefined,
+    staleTime: 0,
   });
 
   const { data: productsData } = useQuery({
@@ -594,10 +739,14 @@ export function ProductPage() {
     queryFn: () => api.products(),
   });
 
-  const product = data?.product ?? null;
+  const product = data?.product ?? (isLoading ? null : cachedProduct);
   const images = data?.images ?? [];
   const variants = data?.variants ?? product?.variants ?? [];
   const activeVariants = useMemo(() => (variants || []).filter((v) => v.is_active !== 0), [variants]);
+
+  useEffect(() => {
+    setSelectedImage(null);
+  }, [selectedVariantId, slug]);
 
   useEffect(() => {
     if (activeVariants.length > 0) {

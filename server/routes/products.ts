@@ -3,6 +3,23 @@ import { db } from "../db.js";
 
 const router = Router();
 
+function parseVariantImages(v: any) {
+  let list: string[] = [];
+  try {
+    if (Array.isArray(v.images)) {
+      list = v.images;
+    } else if (typeof v.images === "string") {
+      list = JSON.parse(v.images);
+    }
+  } catch {}
+  if (!list.length && v.image) {
+    list = [v.image];
+  }
+  v.images = list;
+  v.image = list[0] || v.image || null;
+  return v;
+}
+
 router.get("/", async (_req, res) => {
   const products = await db
     .prepare(
@@ -12,19 +29,6 @@ router.get("/", async (_req, res) => {
        ORDER BY featured DESC, name ASC`,
     )
     .all() as any[];
-
-  function parseVariantImages(v: any) {
-    let list: string[] = [];
-    try {
-      list = v.images ? JSON.parse(v.images) : [];
-    } catch {}
-    if (!list.length && v.image) {
-      list = [v.image];
-    }
-    v.images = list;
-    v.image = list[0] || v.image || null;
-    return v;
-  }
 
   const variants = await db
     .prepare(
@@ -54,9 +58,9 @@ router.get("/:slug", async (req, res) => {
   const product = await db
     .prepare(
       `SELECT id, slug, name, notes, description, price, mrp, image, featured, collection_type, bestseller, key_features, how_to_apply, legal_information, head_notes, heart_notes, base_notes, review, variant_selector_heading
-       FROM products WHERE slug = ? AND status = 'published'`,
+       FROM products WHERE (slug = ? OR LOWER(slug) = LOWER(?)) AND status = 'published'`,
     )
-    .get(req.params.slug);
+    .get(req.params.slug, req.params.slug);
 
   if (!product) {
     res.status(404).json({ error: "Product not found" });
@@ -73,18 +77,7 @@ router.get("/:slug", async (req, res) => {
     )
     .all((product as any).id) as any[];
 
-  const variants = rawVariants.map((v) => {
-    let list: string[] = [];
-    try {
-      list = v.images ? JSON.parse(v.images) : [];
-    } catch {}
-    if (!list.length && v.image) {
-      list = [v.image];
-    }
-    v.images = list;
-    v.image = list[0] || v.image || null;
-    return v;
-  });
+  const variants = rawVariants.map((v) => parseVariantImages(v));
 
   (product as any).variants = variants;
 

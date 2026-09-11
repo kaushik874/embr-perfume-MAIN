@@ -340,9 +340,9 @@ export function CheckoutPage() {
             </div>
             <ul className="mt-5 space-y-4 text-sm text-ink">
               {items.map((i) => (
-                <li key={i.product.slug} className="flex gap-3">
+                <li key={i.variant?.id ? `${i.product.slug}:v${i.variant.id}` : i.product.slug} className="flex gap-3">
                   <img
-                    src={i.product.image ?? "/images/bottle-mini.svg"}
+                    src={i.variant?.image || (i.variant?.images && i.variant.images[0]) || i.product.image || "/images/bottle-mini.svg"}
                     alt={i.product.name}
                     className="h-16 w-12 shrink-0 object-contain"
                     onError={(e) => {
@@ -351,9 +351,12 @@ export function CheckoutPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{i.product.name}</p>
+                    {i.variant ? (
+                      <p className="text-xs font-medium text-ink-muted">{i.variant.name}</p>
+                    ) : null}
                     <p className="text-xs text-ink-muted">Qty {i.quantity}</p>
                   </div>
-                  <span className="font-display text-gold-deep">Rs {i.product.price * i.quantity}</span>
+                  <span className="font-display text-gold-deep">Rs {(i.variant ? i.variant.price : i.product.price) * i.quantity}</span>
                 </li>
               ))}
             </ul>

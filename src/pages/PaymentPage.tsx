@@ -526,7 +526,7 @@ export function PaymentPage() {
                 return (
                   <li key={itemKey} className="flex gap-3">
                     <img
-                      src={i.product.image ?? "/images/bottle-mini.svg"}
+                      src={i.variant?.image || (i.variant?.images && i.variant.images[0]) || i.product.image || "/images/bottle-mini.svg"}
                       alt={i.product.name}
                       className="h-16 w-12 shrink-0 object-contain"
                       onError={(e) => {

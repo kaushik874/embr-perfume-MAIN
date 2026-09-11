@@ -45,7 +45,7 @@ export function CartPage() {
               <li key={itemKey} className="flex gap-4 py-6 sm:gap-5">
                 <Link href={`/product/${product.slug}`} className="shrink-0">
                   <img
-                    src={product.image ?? "/images/bottle-mini.svg"}
+                    src={variant?.image || (variant?.images && variant.images[0]) || product.image || "/images/bottle-mini.svg"}
                     alt={product.name}
                     className="h-24 w-16 object-contain transition-opacity hover:opacity-80 sm:h-28 sm:w-20"
                     onError={(e) => {
