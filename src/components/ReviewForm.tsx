@@ -117,9 +117,19 @@ export function ReviewForm({ slug, orderId, initialData, reviewId, onSuccess, on
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg border border-border-light shadow-sm">
-      <h3 className="font-display text-xl text-ink uppercase">
-        {initialData ? "Edit Your Review" : "Write a Review"}
-      </h3>
+      <div className="flex items-center justify-between pb-3 border-b border-border-light">
+        <h3 className="font-display text-xl text-ink uppercase">
+          {initialData ? "Edit Your Review" : "Write a Review"}
+        </h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="p-1.5 text-ink-muted hover:text-ink transition-colors rounded-full hover:bg-gray-100 cursor-pointer"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
       {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded">{error}</div>}
 

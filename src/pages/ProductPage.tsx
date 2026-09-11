@@ -290,7 +290,7 @@ function ProductGallery({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUpOrLeave}
             onMouseLeave={handleMouseUpOrLeave}
-            className="flex h-full w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain cursor-grab active:cursor-grabbing touch-pan-x"
+            className="flex h-full w-full overflow-x-auto snap-x snap-mandatory cursor-grab active:cursor-grabbing touch-pan-y"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",
