@@ -211,6 +211,8 @@ function ProductGallery({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches) return;
     const el = scrollRef.current;
     if (!el) return;
     isMouseDown.current = true;
@@ -290,11 +292,12 @@ function ProductGallery({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUpOrLeave}
             onMouseLeave={handleMouseUpOrLeave}
-            className="flex h-full w-full overflow-x-auto snap-x snap-mandatory cursor-grab active:cursor-grabbing touch-pan-y"
+            className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain cursor-grab active:cursor-grabbing touch-manipulation"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",
               WebkitOverflowScrolling: "touch",
+              touchAction: "pan-x pan-y",
             }}
           >
             {galleryImages.map((url, index) => (

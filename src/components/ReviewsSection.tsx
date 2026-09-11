@@ -95,7 +95,7 @@ function ReviewCard({
         <p className="mt-3 text-sm text-ink leading-relaxed">{review.comment}</p>
 
         {mediaItems.length > 0 && (
-          <div className="flex gap-2.5 mt-3 overflow-x-auto pb-1 touch-pan-y" style={{ scrollbarWidth: "none" }}>
+          <div className="flex gap-2.5 mt-3 overflow-x-auto overflow-y-hidden pb-1 touch-manipulation" style={{ scrollbarWidth: "none", touchAction: "pan-x pan-y" }}>
             {mediaItems.map((item, idx) => (
               <div
                 key={idx}
@@ -306,6 +306,8 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
   };
 
   const handleReviewsMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches) return;
     const el = reviewsScrollRef.current;
     if (!el) return;
     isReviewDown.current = true;
@@ -461,7 +463,7 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
       {showAll && allVideos.length > 0 && (
         <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-border-light">
           <h3 className="text-sm font-semibold text-ink mb-3 uppercase tracking-wider">Customer Videos</h3>
-          <div className="flex gap-4 overflow-x-auto pb-2 touch-pan-y" style={{ scrollbarWidth: "none" }}>
+          <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-2 touch-manipulation" style={{ scrollbarWidth: "none", touchAction: "pan-x pan-y" }}>
             {allVideos.map((v: any, i: number) => (
               <div 
                 key={i} 
@@ -490,11 +492,12 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
             onMouseMove={handleReviewsMouseMove}
             onMouseUp={handleReviewsMouseUp}
             onMouseLeave={handleReviewsMouseUp}
-            className="flex gap-4 overflow-x-auto snap-x snap-mandatory touch-pan-y pb-4 select-none cursor-grab active:cursor-grabbing"
+            className="flex gap-4 overflow-x-auto overflow-y-hidden snap-x snap-mandatory touch-manipulation pb-4 select-none cursor-grab active:cursor-grabbing"
             style={{
               scrollbarWidth: "none",
               msOverflowStyle: "none",
               WebkitOverflowScrolling: "touch",
+              touchAction: "pan-x pan-y",
             }}
           >
             {displayedReviews.map((review: any) => (
@@ -575,8 +578,8 @@ export function ReviewsSection({ product }: ReviewsSectionProps) {
                   setSelectedMedia((prev) => prev ? { ...prev, activeIndex: newIdx } : null);
                 }
               }}
-              className="flex h-full w-full overflow-x-auto snap-x snap-mandatory touch-pan-y"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+              className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory touch-manipulation"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch", touchAction: "pan-x pan-y" }}
             >
               {selectedMedia.items.map((item, idx) => (
                 <div
