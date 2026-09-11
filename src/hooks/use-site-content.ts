@@ -5,7 +5,6 @@ export function useSiteContent() {
   const { data, isLoading } = useQuery({
     queryKey: ["site-content"],
     queryFn: () => api.getContent(),
-    staleTime: 5 * 60 * 1000, // Cache for 5 mins
   });
 
   const isReady = !isLoading && Boolean(data);

@@ -4,7 +4,7 @@ import { api, type Product } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { useSiteContent } from "@/hooks/use-site-content";
-import { getCachedAdminProducts } from "@/lib/catalog";
+import { QueryErrorState } from "@/components/ui/QueryErrorState";
 
 function ProductCard({ product, index }: { product: Product; index: number }) {
   const { add } = useCart();
@@ -101,13 +101,12 @@ function CollectionSkeleton() {
 export function Collection() {
   const { getVal, isHidden } = useSiteContent();
 
-  const { data } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
-    initialData: () => ({ products: getCachedAdminProducts() }),
   });
 
-  const products = (data?.products ?? getCachedAdminProducts()).filter(
+  const products = (data?.products ?? []).filter(
     (p) => p && p.collection_type !== "secondary"
   );
 
@@ -139,14 +138,18 @@ export function Collection() {
           </Link>
         </div>
 
-        {sorted.length > 0 ? (
+        {isLoading ? (
+          <CollectionSkeleton />
+        ) : isError && sorted.length === 0 ? (
+          <QueryErrorState onRetry={() => refetch()} />
+        ) : sorted.length > 0 ? (
           <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
             {sorted.map((p, i) => (
               <ProductCard key={p.slug} product={p} index={i} />
             ))}
           </div>
         ) : (
-          <CollectionSkeleton />
+          <p className="text-center text-ink-muted py-12">No products available at the moment.</p>
         )}
       </div>
     </section>

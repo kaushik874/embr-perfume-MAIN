@@ -1,11 +1,3 @@
-import {
-  getCachedAdminProducts,
-  setCachedAdminProducts,
-  getCachedHeroBanners,
-  setCachedHeroBanners,
-  getCatalogProduct,
-} from "@/lib/catalog";
-
 function parseError(data: unknown): string {
   if (typeof data === "object" && data !== null && "error" in data) {
     const err = (data as { error: unknown }).error;
@@ -30,19 +22,30 @@ async function request<T>(
   options?: RequestInit,
 ): Promise<T> {
   let res: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  const signal = options?.signal ?? controller.signal;
+
   try {
     res = await fetch(`/api${path}`, {
       ...options,
+      signal,
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...options?.headers,
       },
     });
-  } catch {
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err?.name === "AbortError") {
+      throw new Error("Request timed out. Please check your internet connection.");
+    }
     throw new Error(
-      "Server not running. Please start with: npm run dev",
+      "Unable to connect. Please check your internet connection and try again.",
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   const data = await res.json().catch(() => ({}));
@@ -184,17 +187,7 @@ export const api = {
 
   publicConfig: () => request<{ googleClientId: string }>("/config/public"),
 
-  getHeroBanners: async () => {
-    try {
-      const res = await request<{ banners: HeroBanner[] }>("/hero");
-      if (res?.banners && Array.isArray(res.banners) && res.banners.length > 0) {
-        setCachedHeroBanners(res.banners);
-      }
-      return res;
-    } catch {
-      return { banners: getCachedHeroBanners() };
-    }
-  },
+  getHeroBanners: () => request<{ banners: HeroBanner[] }>("/hero"),
 
   getAboutBanner: () => request<{ banner: any }>("/about-banner"),
 
@@ -254,38 +247,18 @@ export const api = {
     request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
 
   products: async () => {
-    try {
-      const res = await request<{ products: Product[] }>("/products");
-      if (res?.products && Array.isArray(res.products) && res.products.length > 0) {
-        const filtered = res.products.filter((p) => p && p.collection_type !== "secondary");
-        setCachedAdminProducts(filtered);
-        return { products: filtered };
-      }
-      return { products: getCachedAdminProducts() };
-    } catch {
-      return { products: getCachedAdminProducts() };
-    }
+    const res = await request<{ products: Product[] }>("/products");
+    const products = Array.isArray(res?.products)
+      ? res.products.filter((p) => p && p.collection_type !== "secondary")
+      : [];
+    return { products };
   },
 
-  getContent: async () => {
-    try {
-      return await request<{ content: Record<string, string>; sections: Record<string, boolean> }>("/content");
-    } catch {
-      return { content: {}, sections: {} };
-    }
-  },
+  getContent: () =>
+    request<{ content: Record<string, string>; sections: Record<string, boolean> }>("/content"),
 
-  product: async (slug: string) => {
-    try {
-      return await request<{ product: Product; images?: { url: string }[]; variants?: ProductVariant[] }>(`/products/${slug}`);
-    } catch (err) {
-      const cached = getCatalogProduct(slug);
-      if (cached) {
-        return { product: cached, images: cached.image ? [{ url: cached.image }] : [], variants: cached.variants || [] };
-      }
-      throw err;
-    }
-  },
+  product: (slug: string) =>
+    request<{ product: Product; images?: { url: string }[]; variants?: ProductVariant[] }>(`/products/${slug}`),
 
   orders: () => request<{ orders: Order[] }>("/orders/mine"),
 

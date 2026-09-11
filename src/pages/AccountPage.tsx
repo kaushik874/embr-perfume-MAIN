@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useQuery } from "@tanstack/react-query";
 import { ProductCard } from "./CollectionsPage";
-import { CATALOG_PRODUCTS } from "@/lib/catalog";
 
 function invoiceHref(order: Order) {
   const body = [
@@ -55,10 +54,9 @@ export function AccountPage() {
   const { data: productsData } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
-    placeholderData: { products: CATALOG_PRODUCTS },
   });
 
-  const allProducts = productsData?.products ?? CATALOG_PRODUCTS;
+  const allProducts = productsData?.products ?? [];
   const wishlistedProducts = allProducts.filter((p: any) => isWishlisted(p.id));
 
   useEffect(() => {

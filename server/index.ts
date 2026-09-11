@@ -92,6 +92,14 @@ app.use("/api/admin/reviews", uploadLimiter);
 app.use("/api/reviews", uploadLimiter);
 app.use(cookieParser());
 app.use(csrfProtection);
+// Ensure all API endpoints never serve stale cached data
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter, blockRepeatedFailedLogins);
 app.use("/api/auth/register", authLimiter);
@@ -153,11 +161,33 @@ const sourceUploadsDir = path.resolve(process.cwd(), "public", "uploads");
 
 if (process.env.NODE_ENV === "production") {
   // Serve uploaded files from the project-root public/uploads directory
-  // (In case uploads are not included in the dist/public build)
-  app.use("/uploads", express.static(sourceUploadsDir));
-  // Serve frontend build
-  app.use(express.static(publicDir));
+  app.use("/uploads", express.static(sourceUploadsDir, { maxAge: "7d" }));
+  
+  // Serve frontend build with distinct cache policies for entry HTML vs hashed assets
+  app.use(
+    express.static(publicDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith("index.html")) {
+          // Entry HTML must never be cached so users always get the latest bundle references
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        } else if (filePath.includes(path.sep + "assets" + path.sep) || filePath.includes("/assets/")) {
+          // Vite content-hashed assets (JS, CSS) can be cached safely for 1 year
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+          // Other static assets (images, favicon, etc.)
+          res.setHeader("Cache-Control", "public, max-age=86400");
+        }
+      },
+    }),
+  );
+
+  // SPA fallback: index.html must NEVER be cached
   app.get("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.sendFile(path.join(publicDir, "index.html"));
   });
 }

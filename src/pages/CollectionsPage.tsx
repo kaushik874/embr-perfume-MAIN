@@ -7,7 +7,7 @@ import { ShopLayout } from "@/components/layout/ShopLayout";
 import { useReveal } from "@/hooks/use-reveal";
 import { Heart } from "lucide-react";
 import { useWishlist } from "@/hooks/useWishlist";
-import { getCachedAdminProducts } from "@/lib/catalog";
+import { QueryErrorState } from "@/components/ui/QueryErrorState";
 
 export function ProductCard({ product, index }: { product: Product; index: number }) {
   const { add } = useCart();
@@ -115,13 +115,12 @@ export function ProductCard({ product, index }: { product: Product; index: numbe
 
 export function CollectionsPage() {
   useReveal();
-  const { data } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
-    initialData: () => ({ products: getCachedAdminProducts() }),
   });
 
-  const products = (data?.products ?? getCachedAdminProducts()).filter(
+  const products = (data?.products ?? []).filter(
     (p) => p && p.collection_type !== "secondary"
   );
 
@@ -141,13 +140,7 @@ export function CollectionsPage() {
             </h1>
           </div>
 
-          {sorted.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
-              {sorted.map((p, i) => (
-                <ProductCard key={p.slug} product={p} index={i} />
-              ))}
-            </div>
-          ) : (
+          {isLoading ? (
             <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="animate-pulse rounded-lg border border-border-light bg-white p-2.5 md:p-8">
@@ -158,6 +151,16 @@ export function CollectionsPage() {
                 </div>
               ))}
             </div>
+          ) : isError && sorted.length === 0 ? (
+            <QueryErrorState onRetry={() => refetch()} />
+          ) : sorted.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2.5 md:gap-6 md:grid-cols-3">
+              {sorted.map((p, i) => (
+                <ProductCard key={p.slug} product={p} index={i} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-ink-muted py-12">No products found.</p>
           )}
         </div>
       </div>

@@ -5,18 +5,15 @@ import { Link } from "wouter";
 import { Header } from "@/components/site/Header";
 import { api, HeroBanner } from "@/lib/api";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { getCachedHeroBanners } from "@/lib/catalog";
 
 export function Hero() {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["hero-banners"],
     queryFn: () => api.getHeroBanners(),
-    initialData: () => ({ banners: getCachedHeroBanners() }),
-    staleTime: 5 * 60 * 1000,
   });
 
-  const banners = data?.banners ?? getCachedHeroBanners();
-  const isLoaded = banners.length > 0;
+  const banners = data?.banners ?? [];
+  const isLoaded = !isLoading && banners.length > 0;
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {

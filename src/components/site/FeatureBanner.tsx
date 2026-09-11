@@ -4,21 +4,18 @@ import { api } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 import { useSiteContent } from "@/hooks/use-site-content";
-import { getCachedAdminProducts } from "@/lib/catalog";
-
 const bottleEmber = "/images/bottle-forest.svg";
 
 export function FeatureBanner() {
   const { add } = useCart();
   const { getVal, isHidden } = useSiteContent();
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.products(),
-    initialData: () => ({ products: getCachedAdminProducts() }),
   });
-  const featured = (data?.products ?? getCachedAdminProducts()).find((p) => p.slug === "ember-oud");
+  const featured = (data?.products ?? []).find((p) => p.slug === "ember-oud") || data?.products?.[0];
 
-  if (isHidden("section_banner")) return null;
+  if (isHidden("section_banner") || isLoading || !featured) return null;
 
   return (
     <section className="relative overflow-hidden bg-page py-16 md:py-32">
@@ -49,7 +46,7 @@ export function FeatureBanner() {
             {getVal("banner_desc", "Smoky oud wrapped in warm amber resin. A true classic.")}
           </p>
           <div className="reveal flex flex-wrap items-baseline gap-3 pt-2 sm:gap-4">
-            <span className="font-display text-4xl text-gold-deep sm:text-5xl">₹{featured ? featured.price : 1}</span>
+            <span className="font-display text-4xl text-gold-deep sm:text-5xl">₹{featured.price}</span>
             {featured && featured.mrp > featured.price && (
               <span className="text-ink-muted/60 line-through">₹{featured.mrp}</span>
             )}

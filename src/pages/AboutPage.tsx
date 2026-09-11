@@ -16,25 +16,14 @@ type AboutBanner = {
   showButton: number;
 };
 
-const ABOUT_CACHE_KEY = "embr_about_banner";
-
-function getCachedAbout(): AboutBanner | null {
-  try {
-    const raw = sessionStorage.getItem(ABOUT_CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
 export function AboutPage() {
-  const [banner, setBanner] = useState<AboutBanner | null>(getCachedAbout);
-  const [loading, setLoading] = useState(getCachedAbout() === null);
+  const [banner, setBanner] = useState<AboutBanner | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.getAboutBanner()
       .then((res) => {
-        const b = res.banner ?? null;
-        setBanner(b);
-        try { sessionStorage.setItem(ABOUT_CACHE_KEY, JSON.stringify(b)); } catch {}
+        setBanner(res.banner ?? null);
       })
       .catch(() => setBanner(null))
       .finally(() => setLoading(false));

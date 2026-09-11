@@ -12,7 +12,6 @@ export function Footer() {
   const { data } = useQuery({
     queryKey: ["footer-columns"],
     queryFn: () => api.getFooter(),
-    staleTime: 5 * 60 * 1000,
   });
 
   const columns = data?.columns ?? [];

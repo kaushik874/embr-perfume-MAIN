@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { ChevronDown, ChevronLeft, ChevronUp, Minus, Plus, Star, Heart } from "lucide-react";
 import { api, type Product, type ProductVariant } from "@/lib/api";
-import { getCatalogProduct } from "@/lib/catalog";
+import { QueryErrorState } from "@/components/ui/QueryErrorState";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/hooks/useWishlist";
 import { ShopLayout } from "@/components/layout/ShopLayout";
@@ -697,9 +697,7 @@ export function ProductPage() {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
 
-  const cachedProduct = getCatalogProduct(slug);
-
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["product", slug],
     queryFn: () => api.product(slug),
     enabled: Boolean(slug),
@@ -711,7 +709,7 @@ export function ProductPage() {
     queryFn: () => api.products(),
   });
 
-  const product = data?.product ?? (isLoading ? null : cachedProduct);
+  const product = data?.product ?? null;
   const images = data?.images ?? [];
   const variants = data?.variants ?? product?.variants ?? [];
   const activeVariants = useMemo(() => (variants || []).filter((v) => v.is_active !== 0), [variants]);
@@ -809,6 +807,20 @@ export function ProductPage() {
         <ShopLayout>
           <div className="min-h-screen flex items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-ink border-t-transparent"></div>
+          </div>
+        </ShopLayout>
+      );
+    }
+
+    if (isError) {
+      return (
+        <ShopLayout>
+          <div className="min-h-[60vh] flex items-center justify-center">
+            <QueryErrorState
+              title="Unable to load product details"
+              message="Please check your internet connection and try again."
+              onRetry={() => refetch()}
+            />
           </div>
         </ShopLayout>
       );
