@@ -5,4 +5,4 @@ Disallow: /api/
 Disallow: /checkout/
 Disallow: /account/
 
-Sitemap: https://embr.in/sitemap.xml
+Sitemap: https://embrperfume.in/sitemap.xml
