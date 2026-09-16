@@ -222,7 +222,7 @@ export function AdminCoupons() {
               <select
                 value={form.discount_type}
                 onChange={(e) => setForm((f) => ({ ...f, discount_type: e.target.value as "percent" | "fixed" }))}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm"
               >
                 <option value="percent">Percentage (%)</option>
                 <option value="fixed">Fixed Amount (₹)</option>
@@ -248,7 +248,7 @@ export function AdminCoupons() {
                     setForm((f) => ({ ...f, per_customer_limit: "1" }));
                   }
                 }}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm"
               >
                 <option value="unlimited">Unlimited</option>
                 <option value="custom">Custom</option>
@@ -279,7 +279,7 @@ export function AdminCoupons() {
                   setApplicableMode(m);
                   if (m === "all") setSelectedProductIds([]);
                 }}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm"
               >
                 <option value="all">All Products</option>
                 <option value="specific">Specific Products</option>
@@ -346,7 +346,7 @@ export function AdminCoupons() {
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "active" | "inactive" }))}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 py-2 text-sm"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>

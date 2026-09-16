@@ -87,7 +87,8 @@ export function GoogleSignInButton({
           theme: "outline",
           size: "large",
           text,
-          width: Math.min(400, containerRef.current.clientWidth || 400),
+          logo_alignment: "center",
+          width: containerRef.current.clientWidth || 400,
         });
         setGsiReady(true);
       })
@@ -113,7 +114,7 @@ export function GoogleSignInButton({
       {/* GIS rendered button container — hidden until GIS actually renders */}
       <div
         ref={containerRef}
-        className="flex min-h-[44px] justify-center"
+        className="flex min-h-[44px] w-full justify-center"
         style={{ display: gsiReady ? undefined : "none" }}
       />
 
@@ -141,7 +142,8 @@ export function GoogleSignInButton({
                       theme: "outline",
                       size: "large",
                       text,
-                      width: Math.min(400, containerRef.current.clientWidth || 400),
+                      logo_alignment: "center",
+                      width: containerRef.current?.clientWidth || 400,
                     });
                     setGsiReady(true);
                   }
