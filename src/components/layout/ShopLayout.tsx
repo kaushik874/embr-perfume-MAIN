@@ -11,11 +11,11 @@ type ShopLayoutProps = {
 
 /** White shop pages: product, cart, checkout, login, account */
 export function ShopLayout({ children, promo, className }: ShopLayoutProps) {
-  const { getVal, isHidden } = useSiteContent();
+  const { getVal, isHidden, isReady } = useSiteContent();
   const globalPromo = getVal("promo_banner", "");
   const isPromoHidden = isHidden("section_promo");
   
-  const displayPromo = !isPromoHidden && (globalPromo || promo);
+  const displayPromo = isReady && !isPromoHidden && (globalPromo || promo);
 
   return (
     <div className={cn("min-h-screen bg-page text-ink flex flex-col", className)}>
