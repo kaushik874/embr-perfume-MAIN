@@ -64,7 +64,7 @@ export function Footer() {
       </div>
 
       <div className="mx-auto mt-16 flex max-w-7xl flex-col items-center justify-between gap-3 border-t border-border-light px-6 pt-6 text-xs text-ink-muted md:flex-row md:px-10">
-        <span>{getVal("footer_copyright", "© 2026 Embr Parfums. All rights reserved.")}</span>
+        <span>{getVal("footer_copyright", "© 2026 EMBR Perfume. All rights reserved.")}</span>
         <span className="tracking-widest">{getVal("footer_slogan", "— SCENT THE UNSEEN —")}</span>
       </div>
     </footer>

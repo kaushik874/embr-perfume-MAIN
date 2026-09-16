@@ -314,7 +314,7 @@ export function PaymentPage() {
         key: result.keyId,
         amount: result.amount,
         currency: "INR",
-        name: "Embr Parfums",
+        name: "EMBR Perfume",
         description: `${paymentOptions.find((p) => p.id === paymentMethod)?.label ?? "Payment"} for perfume order`,
         order_id: result.razorpayOrderId,
         prefill: {

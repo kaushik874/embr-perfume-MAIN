@@ -760,7 +760,7 @@ export function ProductPage() {
   useEffect(() => {
     if (!product) return;
 
-    document.title = `${product.name} | Embr Parfums`;
+    document.title = `${product.name} | EMBR Perfume`;
 
     let metaDesc = document.querySelector('meta[name="description"]');
     if (!metaDesc) {
@@ -796,7 +796,7 @@ export function ProductPage() {
     });
 
     return () => {
-      document.title = "Embr Parfums";
+      document.title = "EMBR Perfume | Premium Long-Lasting Fragrances";
       script.remove();
     };
   }, [product, mainImage, currentPrice, selectedVariant]);

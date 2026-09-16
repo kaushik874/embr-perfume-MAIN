@@ -48,9 +48,9 @@ export function AboutPage() {
         <Header variant="light" />
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-24 text-center min-h-[calc(100svh-5rem)]">
           <p className="font-display text-xs tracking-[0.4em] text-gold-deep">— OUR STORY</p>
-          <h1 className="mt-4 font-serif text-4xl text-ink md:text-5xl">Embr Parfums</h1>
+          <h1 className="mt-4 font-serif text-4xl text-ink md:text-5xl">EMBR Perfume</h1>
           <p className="mt-6 max-w-xl mx-auto text-ink-muted leading-relaxed">
-            Embr Parfums crafts luxury fragrances inspired by memory, mood, and the quiet moments between day and night.
+            EMBR Perfume crafts luxury fragrances inspired by memory, mood, and the quiet moments between day and night.
           </p>
         </div>
       </main>

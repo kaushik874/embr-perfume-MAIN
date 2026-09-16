@@ -92,7 +92,7 @@ export async function openRazorpayCheckout(options: {
       key: options.keyId,
       amount: options.amount,
       currency: options.currency,
-      name: "Embr Parfums",
+      name: "EMBR Perfume",
       description: options.description,
       order_id: options.orderId,
       prefill: { email: options.email, name: options.name },

@@ -90,8 +90,8 @@ export function baseTemplate(title: string, content: string) {
     </div>
     <div class="footer">
       <p>Crafted in shadow. Worn in light.</p>
-      <p>&copy; ${new Date().getFullYear()} Embr Perfume. All rights reserved.</p>
-      <p>Need help? Contact <a href="mailto:support@embrperfume.com">support@embrperfume.com</a></p>
+      <p>&copy; ${new Date().getFullYear()} EMBR Perfume. All rights reserved.</p>
+      <p>Need help? Contact <a href="mailto:hello.embrperfume@gmail.com">hello.embrperfume@gmail.com</a></p>
     </div>
   </div>
 </body>
@@ -112,19 +112,19 @@ export function otpEmail(otp: string) {
     
     <p>If you didn't request this code, you can safely ignore this email.</p>
   `;
-  return baseTemplate("Verify your Email - Embr Perfume", content);
+  return baseTemplate("Verify your Email - EMBR Perfume", content);
 }
 
 export function welcomeEmail(name: string) {
   const content = `
-    <h2 style="font-family: 'Playfair Display', serif; font-weight: normal; margin-top: 0;">Welcome to Embr, ${name}</h2>
-    <p>We're thrilled to have you join our world. Embr was founded on the belief that fragrance should be felt before it is smelled — a presence, a memory, a whisper that lingers.</p>
+    <h2 style="font-family: 'Playfair Display', serif; font-weight: normal; margin-top: 0;">Welcome to EMBR, ${name}</h2>
+    <p>We're thrilled to have you join our world. EMBR was founded on the belief that fragrance should be felt before it is smelled — a presence, a memory, a whisper that lingers.</p>
     <p>As a member, you'll be the first to know about new releases, exclusive collections, and private events.</p>
     <div style="text-align: center; margin-top: 40px;">
-      <a href="${process.env.CLIENT_URL || 'https://embrperfume.com'}" class="btn">Discover Our Collection</a>
+      <a href="${process.env.CLIENT_URL || 'https://embrperfume.in'}" class="btn">Discover Our Collection</a>
     </div>
   `;
-  return baseTemplate("Welcome to Embr Perfume", content);
+  return baseTemplate("Welcome to EMBR Perfume", content);
 }
 
 export function passwordResetSuccessEmail() {
@@ -188,7 +188,7 @@ export function orderConfirmationEmail(order: any, items: any[]) {
       </p>
     </div>
   `;
-  return baseTemplate(`Order #${order.id} Confirmed - Embr Perfume`, content);
+  return baseTemplate(`Order #${order.id} Confirmed - EMBR Perfume`, content);
 }
 
 export function orderStatusEmail(order: any, status: string) {
@@ -208,7 +208,7 @@ export function orderStatusEmail(order: any, status: string) {
     ${order.tracking_number ? `<p><strong>Tracking Number:</strong> ${order.tracking_number}</p>` : ''}
     
     <div style="text-align: center; margin-top: 40px;">
-      <a href="${process.env.CLIENT_URL || 'https://embrperfume.com'}/account" class="btn">View Order History</a>
+      <a href="${process.env.CLIENT_URL || 'https://embrperfume.in'}/account" class="btn">View Order History</a>
     </div>
   `;
   return baseTemplate(`Order #${order.id} Update: ${status.toUpperCase()}`, content);
