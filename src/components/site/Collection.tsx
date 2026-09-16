@@ -125,14 +125,13 @@ export function Collection() {
   return (
     <section id="collection" className="bg-page pt-4 pb-16 md:py-32">
       <div className="mx-auto max-w-7xl px-3 sm:px-6 md:px-10">
-        <div className="mb-8 md:mb-14 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="reveal">
-            <p className="font-display text-xs tracking-[0.4em] text-gold-deep">{getVal("collection_eyebrow", "— THE EDIT")}</p>
-            <h2 className="mt-3 font-serif text-3xl text-ink sm:text-4xl md:text-6xl">{getVal("collection_heading", "Our Collection")}</h2>
-          </div>
+        <div className="mb-6 md:mb-14 flex items-center justify-between gap-4">
+          <h2 className="reveal font-serif text-2xl sm:text-4xl md:text-6xl text-ink leading-none">
+            {getVal("collection_heading", "Our Collection")}
+          </h2>
           <Link
             href="/collections"
-            className="reveal shrink-0 text-xs sm:text-sm tracking-widest text-ink-muted hover:text-gold-deep hover:underline"
+            className="reveal shrink-0 text-xs sm:text-base md:text-lg font-medium tracking-widest text-ink-muted hover:text-gold-deep transition-colors uppercase"
           >
             ALL COLLECTION →
           </Link>
