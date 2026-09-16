@@ -677,6 +677,10 @@ export async function initDb(options: { seedDefaults?: boolean } = {}) {
   } catch (e) {}
 
   try {
+    await db.exec("ALTER TABLE coupons ADD COLUMN IF NOT EXISTS applicable_product_ids TEXT");
+  } catch (e) {}
+
+  try {
     await db.exec("ALTER TABLE coupons ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ");
   } catch (e) {}
 

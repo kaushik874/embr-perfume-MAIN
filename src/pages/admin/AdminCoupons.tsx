@@ -46,6 +46,7 @@ function formatDateForInput(dateStr: string | null | undefined): string {
 
 export function AdminCoupons() {
   const [coupons, setCoupons] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -53,6 +54,8 @@ export function AdminCoupons() {
   const [form, setForm] = useState<CouponForm>(emptyForm);
 
   const [perCustomerLimitMode, setPerCustomerLimitMode] = useState<"unlimited" | "custom">("unlimited");
+  const [applicableMode, setApplicableMode] = useState<"all" | "specific">("all");
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
 
   const loadCoupons = () => {
     setLoading(true);
@@ -60,6 +63,10 @@ export function AdminCoupons() {
       .then((res) => setCoupons(res.coupons))
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
+
+    adminApi.getProducts()
+      .then((res) => setProducts(res.products || []))
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -70,6 +77,8 @@ export function AdminCoupons() {
     setEditingId(null);
     setForm(emptyForm);
     setPerCustomerLimitMode("unlimited");
+    setApplicableMode("all");
+    setSelectedProductIds([]);
     setShowForm(true);
   };
 
@@ -77,6 +86,21 @@ export function AdminCoupons() {
     setEditingId(coupon.id);
     const hasLimit = coupon.per_customer_limit != null && Number(coupon.per_customer_limit) > 0;
     setPerCustomerLimitMode(hasLimit ? "custom" : "unlimited");
+
+    let applicableIds: number[] = [];
+    if (coupon.applicable_product_ids) {
+      try {
+        const parsed = typeof coupon.applicable_product_ids === "string"
+          ? JSON.parse(coupon.applicable_product_ids)
+          : coupon.applicable_product_ids;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          applicableIds = parsed.map(Number).filter((n) => !isNaN(n) && n > 0);
+        }
+      } catch {}
+    }
+    setApplicableMode(applicableIds.length > 0 ? "specific" : "all");
+    setSelectedProductIds(applicableIds);
+
     setForm({
       code: coupon.code || "",
       discount_type: coupon.discount_type || "percent",
@@ -123,6 +147,10 @@ export function AdminCoupons() {
       toast.error("Please enter a valid positive number for per customer limit");
       return;
     }
+    if (applicableMode === "specific" && selectedProductIds.length === 0) {
+      toast.error("Please select at least one applicable product");
+      return;
+    }
     setSubmitting(true);
     try {
       const body = {
@@ -132,6 +160,7 @@ export function AdminCoupons() {
         min_order_value: form.min_order_value ? Number(form.min_order_value) : null,
         max_discount: form.max_discount ? Number(form.max_discount) : null,
         per_customer_limit: perCustomerLimitMode === "custom" && form.per_customer_limit ? Number(form.per_customer_limit) : null,
+        applicable_product_ids: applicableMode === "specific" ? selectedProductIds : null,
         usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
         starts_at: form.starts_at || null,
         expiry_date: form.expiry_date || null,
@@ -242,6 +271,59 @@ export function AdminCoupons() {
             )}
 
             <div className="space-y-1">
+              <Label>Applicable Products</Label>
+              <select
+                value={applicableMode}
+                onChange={(e) => {
+                  const m = e.target.value as "all" | "specific";
+                  setApplicableMode(m);
+                  if (m === "all") setSelectedProductIds([]);
+                }}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="all">All Products</option>
+                <option value="specific">Specific Products</option>
+              </select>
+            </div>
+
+            {applicableMode === "specific" && (
+              <div className="col-span-1 sm:col-span-2 lg:col-span-3 space-y-2 border border-gray-200 dark:border-gray-800 rounded-md p-3 bg-gray-50/50 dark:bg-gray-900/50">
+                <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Select Products applicable for this coupon *
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {products.map((p) => {
+                    const checked = selectedProductIds.includes(p.id);
+                    return (
+                      <label
+                        key={p.id}
+                        className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer border transition-colors ${
+                          checked
+                            ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 font-medium text-amber-900 dark:text-amber-200"
+                            : "bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedProductIds([...selectedProductIds, p.id]);
+                            } else {
+                              setSelectedProductIds(selectedProductIds.filter((id) => id !== p.id));
+                            }
+                          }}
+                          className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="truncate">{p.name} (₹{p.price})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1">
               <Label>Start Date & Time</Label>
               <Input
                 type="datetime-local"
@@ -317,6 +399,22 @@ export function AdminCoupons() {
                   <td className="px-6 py-4 text-xs text-gray-500">
                     {c.min_order_value ? <div>Min order: ₹{c.min_order_value}</div> : null}
                     {c.per_customer_limit ? <div>Per user: {c.per_customer_limit}x</div> : null}
+                    {(() => {
+                      let ids: number[] = [];
+                      if (c.applicable_product_ids) {
+                        try {
+                          const parsed = typeof c.applicable_product_ids === "string" ? JSON.parse(c.applicable_product_ids) : c.applicable_product_ids;
+                          if (Array.isArray(parsed)) ids = parsed.map(Number);
+                        } catch {}
+                      }
+                      return ids.length > 0 ? (
+                        <div className="text-amber-600 dark:text-amber-400 font-medium">
+                          Products: {ids.length} selected
+                        </div>
+                      ) : (
+                        <div>Products: All</div>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     <span className={c.usage_limit && c.times_used >= c.usage_limit ? "text-red-600" : ""}>

@@ -12,11 +12,29 @@ const couponSchema = z.object({
   min_order_value: z.number().int().nonnegative().nullable().optional(),
   max_discount: z.number().int().positive().nullable().optional(),
   per_customer_limit: z.number().int().positive().nullable().optional(),
+  applicable_product_ids: z.union([z.array(z.number()), z.string()]).nullable().optional(),
   usage_limit: z.number().int().positive().nullable().optional(),
   starts_at: z.string().nullable().optional(),
   expiry_date: z.string().nullable().optional(),
   status: z.enum(["active", "inactive"]).default("active"),
 });
+
+function formatApplicableProductIds(input: unknown): string | null {
+  if (Array.isArray(input)) {
+    const ids = input.map(Number).filter((n) => !isNaN(n) && n > 0);
+    return ids.length > 0 ? JSON.stringify(ids) : null;
+  }
+  if (typeof input === "string" && input.trim()) {
+    try {
+      const parsed = JSON.parse(input);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const ids = parsed.map(Number).filter((n) => !isNaN(n) && n > 0);
+        return ids.length > 0 ? JSON.stringify(ids) : null;
+      }
+    } catch {}
+  }
+  return null;
+}
 
 router.get("/coupons", async (_req, res) => {
   const coupons = await db.prepare(
@@ -33,13 +51,14 @@ router.post("/coupons", async (req, res) => {
   }
   const data = parsed.data;
   const code = data.code.toUpperCase();
+  const applicableProductIds = formatApplicableProductIds(data.applicable_product_ids);
   try {
     const result = await db.prepare(`
       INSERT INTO coupons (
         code, discount_type, discount_value, min_order_value, max_discount,
-        per_customer_limit, usage_limit, starts_at, expiry_date, status
+        per_customer_limit, applicable_product_ids, usage_limit, starts_at, expiry_date, status
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       code,
       data.discount_type,
@@ -47,6 +66,7 @@ router.post("/coupons", async (req, res) => {
       data.min_order_value ?? null,
       data.max_discount ?? null,
       data.per_customer_limit ?? null,
+      applicableProductIds,
       data.usage_limit ?? null,
       data.starts_at ?? null,
       data.expiry_date ?? null,
@@ -72,12 +92,13 @@ router.put("/coupons/:id", async (req, res) => {
   }
   const data = parsed.data;
   const code = data.code.toUpperCase();
+  const applicableProductIds = formatApplicableProductIds(data.applicable_product_ids);
   try {
     const result = await db.prepare(`
       UPDATE coupons SET
         code = ?, discount_type = ?, discount_value = ?,
         min_order_value = ?, max_discount = ?, per_customer_limit = ?,
-        usage_limit = ?, starts_at = ?, expiry_date = ?, status = ?,
+        applicable_product_ids = ?, usage_limit = ?, starts_at = ?, expiry_date = ?, status = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
@@ -87,6 +108,7 @@ router.put("/coupons/:id", async (req, res) => {
       data.min_order_value ?? null,
       data.max_discount ?? null,
       data.per_customer_limit ?? null,
+      applicableProductIds,
       data.usage_limit ?? null,
       data.starts_at ?? null,
       data.expiry_date ?? null,

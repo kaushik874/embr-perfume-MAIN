@@ -18,12 +18,25 @@ export type CouponRecord = {
   min_order_value: number | null;
   max_discount: number | null;
   per_customer_limit: number | null;
+  applicable_product_ids?: string | null;
   usage_limit: number | null;
   times_used: number;
   starts_at: string | null;
   expiry_date: string | null;
   status: string;
 };
+
+export function parseApplicableProductIds(raw: string | null | undefined): number[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const ids = parsed.map(Number).filter((n) => !isNaN(n) && n > 0);
+      return ids.length > 0 ? ids : null;
+    }
+  } catch {}
+  return null;
+}
 
 export type PricingResult = {
   subtotalPaise: number;
@@ -239,7 +252,22 @@ export async function calculateOrderPricing(
 
   if (couponCode) {
     coupon = await validateCoupon(couponCode, subtotalPaise, userId);
-    couponDiscountPaise = calculateCouponDiscount(coupon, subtotalPaise);
+    
+    // Check product applicability
+    const applicableProductIds = parseApplicableProductIds(coupon.applicable_product_ids);
+    let eligibleSubtotalPaise = subtotalPaise;
+
+    if (applicableProductIds !== null) {
+      eligibleSubtotalPaise = lineItems
+        .filter((item) => applicableProductIds.includes(item.productId))
+        .reduce((sum, item) => sum + item.pricePaise * item.quantity, 0);
+
+      if (eligibleSubtotalPaise <= 0) {
+        throw new Error("This coupon is not applicable to the items in your cart.");
+      }
+    }
+
+    couponDiscountPaise = calculateCouponDiscount(coupon, eligibleSubtotalPaise);
   }
 
   // Free Shipping Threshold logic
