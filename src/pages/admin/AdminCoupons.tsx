@@ -64,7 +64,7 @@ export function AdminCoupons() {
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
 
-    adminApi.getProducts()
+    adminApi.products()
       .then((res) => setProducts(res.products || []))
       .catch(() => {});
   };
