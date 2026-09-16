@@ -71,13 +71,18 @@ export async function validateCoupon(
     throw new Error("Coupon usage limit reached");
   }
 
-  // Check per-customer limit
-  if (coupon.per_customer_limit != null && userId) {
-    const usage = await db.prepare(
-      "SELECT COUNT(*) as c FROM coupon_usages WHERE coupon_id = ? AND user_id = ?"
-    ).get(coupon.id, userId) as { c: number };
+  // Check per-customer limit (counts only successfully completed/paid orders)
+  if (coupon.per_customer_limit != null && coupon.per_customer_limit > 0 && userId) {
+    const usage = await db.prepare(`
+      SELECT COUNT(*) as c
+      FROM coupon_usages cu
+      JOIN orders o ON cu.order_id = o.id
+      WHERE cu.coupon_id = ?
+        AND cu.user_id = ?
+        AND o.status IN ('paid', 'shipped', 'delivered')
+    `).get(coupon.id, userId) as { c: number };
     if (usage.c >= coupon.per_customer_limit) {
-      throw new Error("You have already used this coupon the maximum number of times");
+      throw new Error("You have reached the usage limit for this coupon.");
     }
   }
 

@@ -9,14 +9,11 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export function RegisterPage() {
-  const { register, sendSignupOtp, loginWithGoogle } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [location, setLocation] = useLocation();
-  const [mode, setMode] = useState<"details" | "otp">("details");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpMessage, setOtpMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const next = useMemo(() => {
@@ -26,7 +23,7 @@ export function RegisterPage() {
   }, [location]);
 
   const finishRegister = () => {
-    toast.success("Account created");
+    toast.success("Account created successfully");
     setLocation(next);
   };
 
@@ -34,15 +31,8 @@ export function RegisterPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "details") {
-        const result = await sendSignupOtp(email.trim());
-        setOtpMessage(result.message);
-        setMode("otp");
-        toast.success(result.message);
-      } else {
-        await register(name, email, password, otp);
-        finishRegister();
-      }
+      await register(name.trim(), email.trim(), password);
+      finishRegister();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -82,78 +72,52 @@ export function RegisterPage() {
         </div>
 
         <form onSubmit={onSubmit} className="mt-2 space-y-5">
-          {mode === "details" && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-ink">Full name</Label>
-                <Input
-                  id="name"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="border-border-light bg-white text-ink"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-ink">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="border-border-light bg-white text-ink"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-ink">Password (min 6 characters)</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="border-border-light bg-white text-ink"
-                />
-              </div>
-            </>
-          )}
-
-          {mode === "otp" && (
-            <>
-              <div className="rounded-lg border border-gold-deep/30 bg-gold-deep/10 p-4 text-sm text-ink">
-                <p className="font-medium text-gold-deep">Email verification</p>
-                <p className="mt-2 text-ink-muted">Check your email ({email}) for the 6-digit code.</p>
-                {otpMessage && <p className="mt-2 text-xs text-ink-muted">{otpMessage}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-otp" className="text-ink">6 digit code</Label>
-                <Input
-                  id="signup-otp"
-                  inputMode="numeric"
-                  required
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  className="border-border-light bg-white text-ink"
-                />
-              </div>
-            </>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-ink">Full name</Label>
+            <Input
+              id="name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="border-border-light bg-white text-ink"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-ink">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="border-border-light bg-white text-ink"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-ink">Password (min 6 characters)</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="border-border-light bg-white text-ink"
+            />
+          </div>
 
           <Button
             type="submit"
             disabled={busy}
             className="w-full rounded-full bg-gradient-gold text-charcoal hover:opacity-90"
           >
-            {busy ? "Please wait..." : mode === "details" ? "Send verification email" : "Create account"}
+            {busy ? "Please wait..." : "Create Account"}
           </Button>
         </form>
 
         <p className="mt-8 text-center text-sm text-ink-muted">
           Already have an account?{" "}
-          <Link href="/login" className="text-gold-deep hover:underline">
+          <Link href="/register" className="text-gold-deep hover:underline" onClick={(e) => { e.preventDefault(); setLocation("/login"); }}>
             Sign in
           </Link>
         </p>

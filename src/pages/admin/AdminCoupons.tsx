@@ -52,6 +52,8 @@ export function AdminCoupons() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<CouponForm>(emptyForm);
 
+  const [perCustomerLimitMode, setPerCustomerLimitMode] = useState<"unlimited" | "custom">("unlimited");
+
   const loadCoupons = () => {
     setLoading(true);
     adminApi.getCoupons()
@@ -67,18 +69,21 @@ export function AdminCoupons() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setPerCustomerLimitMode("unlimited");
     setShowForm(true);
   };
 
   const openEdit = (coupon: any) => {
     setEditingId(coupon.id);
+    const hasLimit = coupon.per_customer_limit != null && Number(coupon.per_customer_limit) > 0;
+    setPerCustomerLimitMode(hasLimit ? "custom" : "unlimited");
     setForm({
       code: coupon.code || "",
       discount_type: coupon.discount_type || "percent",
       discount_value: String(coupon.discount_value ?? ""),
       min_order_value: coupon.min_order_value != null ? String(coupon.min_order_value) : "",
       max_discount: coupon.max_discount != null ? String(coupon.max_discount) : "",
-      per_customer_limit: coupon.per_customer_limit != null ? String(coupon.per_customer_limit) : "",
+      per_customer_limit: hasLimit ? String(coupon.per_customer_limit) : "",
       usage_limit: coupon.usage_limit != null ? String(coupon.usage_limit) : "",
       starts_at: formatDateForInput(coupon.starts_at),
       expiry_date: formatDateForInput(coupon.expiry_date),
@@ -114,6 +119,10 @@ export function AdminCoupons() {
       toast.error("Code and discount value are required");
       return;
     }
+    if (perCustomerLimitMode === "custom" && (!form.per_customer_limit || Number(form.per_customer_limit) <= 0)) {
+      toast.error("Please enter a valid positive number for per customer limit");
+      return;
+    }
     setSubmitting(true);
     try {
       const body = {
@@ -122,7 +131,7 @@ export function AdminCoupons() {
         discount_value: Number(form.discount_value),
         min_order_value: form.min_order_value ? Number(form.min_order_value) : null,
         max_discount: form.max_discount ? Number(form.max_discount) : null,
-        per_customer_limit: form.per_customer_limit ? Number(form.per_customer_limit) : null,
+        per_customer_limit: perCustomerLimitMode === "custom" && form.per_customer_limit ? Number(form.per_customer_limit) : null,
         usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
         starts_at: form.starts_at || null,
         expiry_date: form.expiry_date || null,
@@ -196,7 +205,42 @@ export function AdminCoupons() {
             {field("min_order_value", "Min Order Value (₹)", { type: "number", min: "0", placeholder: "No minimum" })}
             {field("max_discount", "Max Discount (₹)", { type: "number", min: "1", placeholder: "No cap" })}
             {field("usage_limit", "Total Usage Limit", { type: "number", min: "1", placeholder: "Unlimited" })}
-            {field("per_customer_limit", "Per Customer Limit", { type: "number", min: "1", placeholder: "Unlimited" })}
+            
+            <div className="space-y-1">
+              <Label>Usage limit per customer</Label>
+              <select
+                value={perCustomerLimitMode}
+                onChange={(e) => {
+                  const mode = e.target.value as "unlimited" | "custom";
+                  setPerCustomerLimitMode(mode);
+                  if (mode === "unlimited") {
+                    setForm((f) => ({ ...f, per_customer_limit: "" }));
+                  } else if (!form.per_customer_limit) {
+                    setForm((f) => ({ ...f, per_customer_limit: "1" }));
+                  }
+                }}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="unlimited">Unlimited</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            {perCustomerLimitMode === "custom" && (
+              <div className="space-y-1">
+                <Label>Per Customer Max Uses *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 1, 2, 5, 10"
+                  value={form.per_customer_limit}
+                  onChange={(e) => setForm((f) => ({ ...f, per_customer_limit: e.target.value }))}
+                  className="bg-white dark:bg-gray-900"
+                  required
+                />
+              </div>
+            )}
+
             <div className="space-y-1">
               <Label>Start Date & Time</Label>
               <Input

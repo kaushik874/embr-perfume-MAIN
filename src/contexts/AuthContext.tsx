@@ -16,7 +16,7 @@ type AuthContextValue = {
   verifyOtp: (identifier: string, otp: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
   sendSignupOtp: (email: string) => Promise<{ message: string }>;
-  register: (name: string, email: string, password: string, otp: string) => Promise<void>;
+  register: (name: string, email: string, password: string, otp?: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<{ message: string }>;
   resetPassword: (email: string, otp: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { message: result.message };
   };
 
-  const register = async (name: string, email: string, password: string, otp: string) => {
+  const register = async (name: string, email: string, password: string, otp?: string) => {
     const { user: u } = await api.register({ name, email, password, otp });
     setUser(u);
   };

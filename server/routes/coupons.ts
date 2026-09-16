@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { db } from "../db.js";
 import {
   calculateOrderPricing,
   validateCoupon,
@@ -11,6 +12,7 @@ const router = Router();
 
 const validateSchema = z.object({
   code: z.string().optional(),
+  email: z.string().email().optional(),
   items: z.array(
     z.object({
       slug: z.string().min(1).optional(),
@@ -24,7 +26,7 @@ const validateSchema = z.object({
 });
 
 // Public endpoint – no auth required so checkout can validate coupons
-// Optionally reads the auth cookie to check per-customer limits
+// Optionally reads the auth cookie or email to check per-customer limits
 router.post("/validate", async (req, res) => {
   const parsed = validateSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -32,7 +34,7 @@ router.post("/validate", async (req, res) => {
     return;
   }
 
-  const { code, items } = parsed.data;
+  const { code, items, email } = parsed.data;
 
   // Try to extract userId from auth cookie for per-customer limit checks
   let userId: number | undefined;
@@ -44,6 +46,11 @@ router.post("/validate", async (req, res) => {
   if (token) {
     const payload = verifyToken(token);
     if (payload) userId = payload.userId;
+  }
+
+  if (!userId && email) {
+    const u = await db.prepare("SELECT id FROM users WHERE LOWER(email) = LOWER(?)").get(email) as { id: number } | undefined;
+    if (u) userId = u.id;
   }
 
   try {

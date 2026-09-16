@@ -178,8 +178,14 @@ router.post("/guest-checkout", async (req, res) => {
     couponId: number | null;
   } | undefined;
 
+  const user = await ensureUserFromShipping({
+    name: shipping.name,
+    email: shipping.email,
+    phone: shipping.phone,
+  });
+
   try {
-    const pricing = await calculateOrderPricing(items, couponCode);
+    const pricing = await calculateOrderPricing(items, couponCode, user.id);
     totalPaise = pricing.totalPaise;
     lineItems = pricing.lineItems;
     pricingBreakdown = {
@@ -197,17 +203,6 @@ router.post("/guest-checkout", async (req, res) => {
     });
     return;
   }
-
-  if (totalPaise < 100) {
-    res.status(400).json({ error: "Order amount must be at least 1 INR (100 paise)" });
-    return;
-  }
-
-  const user = await ensureUserFromShipping({
-    name: shipping.name,
-    email: shipping.email,
-    phone: shipping.phone,
-  });
 
   let checkoutOrder = await findReusableCheckoutOrder(user.id, checkoutSessionId);
   if (checkoutOrder && paidOrderStatuses.has(checkoutOrder.status)) {

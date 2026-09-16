@@ -17,7 +17,7 @@ const registerSchema = z.object({
   name: z.string().min(2).max(80),
   email: z.string().email(),
   password: z.string().min(6).max(128),
-  otp: z.string().regex(/^[0-9]{6}$/),
+  otp: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -137,7 +137,7 @@ router.post("/register", async (req, res) => {
     return;
   }
 
-  const { name, password, otp } = parsed.data;
+  const { name, password } = parsed.data;
   const email = parsed.data.email.toLowerCase();
 
   const existing = await db
@@ -149,38 +149,7 @@ router.post("/register", async (req, res) => {
     return;
   }
 
-  const otpRow = await db.prepare(`
-    SELECT id, otp_hash, attempts FROM email_otps
-    WHERE email = ?
-      AND purpose = 'signup'
-      AND consumed_at IS NULL
-      AND expires_at > CURRENT_TIMESTAMP
-    ORDER BY id DESC
-    LIMIT 1
-  `).get(email) as { id: number, otp_hash: string, attempts: number } | undefined;
-
-  if (!otpRow) {
-    res.status(401).json({ error: OTP_INVALID });
-    return;
-  }
-
-  if (otpRow.attempts >= 5) {
-    await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?").run(otpRow.id);
-    res.status(429).json({ error: OTP_TOO_MANY_ATTEMPTS });
-    return;
-  }
-
-  if (!bcrypt.compareSync(otp, otpRow.otp_hash)) {
-    if (otpRow.attempts >= 4) {
-      await db.prepare("UPDATE email_otps SET consumed_at = CURRENT_TIMESTAMP, attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
-    } else {
-      await db.prepare("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?").run(otpRow.id);
-    }
-    res.status(401).json({ error: OTP_INVALID });
-    return;
-  }
-
-  // Create User
+  // Create User directly
   const password_hash = bcrypt.hashSync(password, 10);
   const result = await db
     .prepare(
@@ -190,10 +159,9 @@ router.post("/register", async (req, res) => {
 
   const token = signToken({ userId: Number(result.lastInsertRowid), email, role: "user" });
   setAuthCookie(res, token);
-  await db.prepare("DELETE FROM email_otps WHERE id = ?").run(otpRow.id);
 
   // Send Welcome Email asynchronously
-  sendEmail(email, name, "Welcome to Embr Perfume", welcomeEmail(name)).catch(console.error);
+  sendEmail(email, name, "Welcome to EMBR Perfume", welcomeEmail(name)).catch(console.error);
 
   res.status(201).json({
     user: { id: result.lastInsertRowid, name, email, role: "user" },

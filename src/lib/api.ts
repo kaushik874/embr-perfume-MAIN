@@ -225,7 +225,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  register: (body: { name: string; email: string; password: string; otp: string }) =>
+  register: (body: { name: string; email: string; password: string; otp?: string }) =>
     request<{ user: User }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(body),

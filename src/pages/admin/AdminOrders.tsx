@@ -280,6 +280,11 @@ export function AdminOrders() {
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900 dark:text-white">{o.shipping_name || "Guest"}</p>
                     <p className="text-xs text-gray-500">{o.account_email}</p>
+                    {o.coupon_code && (
+                      <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-mono font-medium">
+                        Coupon: {o.coupon_code}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">{new Date(o.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3 font-medium">₹{(o.total_paise / 100).toFixed(2)}</td>
@@ -374,6 +379,14 @@ export function AdminOrders() {
                 <p className="text-gray-500">Address:</p><p className="text-gray-900 dark:text-white">{selectedOrder.shipping_address || "—"}</p>
                 <p className="text-gray-500">City:</p><p className="text-gray-900 dark:text-white">{selectedOrder.shipping_city || "—"}</p>
                 <p className="text-gray-500">Pincode:</p><p className="text-gray-900 dark:text-white">{selectedOrder.shipping_pincode || "—"}</p>
+                {selectedOrder.coupon_code && (
+                  <>
+                    <p className="text-gray-500">Coupon Used:</p>
+                    <p className="font-mono text-amber-700 dark:text-amber-400 font-semibold">
+                      {selectedOrder.coupon_code} {selectedOrder.coupon_discount_paise ? `(-₹${(selectedOrder.coupon_discount_paise / 100).toFixed(2)})` : ''}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
