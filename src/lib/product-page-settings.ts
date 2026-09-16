@@ -53,7 +53,7 @@ export const productPageSettings = {
     features: { visible: true },
     apply: { visible: true },
     ingredients: { visible: false },
-    legal: { visible: true },
+    legal: { visible: false },
     reviews: { visible: true },
     related: { visible: true },
   } satisfies Record<ProductPageSectionId, { visible: boolean }>,
@@ -66,7 +66,6 @@ export const productPageSettings = {
     "features",
     "apply",
     "ingredients",
-    "legal",
     "reviews",
     "related",
   ] satisfies ProductPageSectionId[],
@@ -94,7 +93,7 @@ export const productPageSettings = {
     buttonWidth: "100%",
     buttonHeight: "56px",
     accordionHeight: "auto",
-    accordionPadding: "24px",
+    accordionPadding: "14px",
   },
 
   text: {
@@ -185,7 +184,7 @@ export const productPageSettings = {
     },
     {
       id: "legal",
-      visible: true,
+      visible: false,
       title: "Legal Information",
       content:
         "Country of Origin: India\nManufactured and marketed details can be edited here.",

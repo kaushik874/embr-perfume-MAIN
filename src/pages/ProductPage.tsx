@@ -84,15 +84,11 @@ function AccordionItem({
   }, [open, storageKey]);
 
   return (
-    <div className="border-b border-border-light first:border-t">
+    <div>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-6 text-left font-display text-xl uppercase text-ink transition-colors hover:text-gold-deep"
-        style={{
-          minHeight: productPageSettings.layout.accordionHeight,
-          paddingBlock: productPageSettings.layout.accordionPadding,
-        }}
+        className="flex w-full items-center justify-between gap-6 text-left font-display text-lg uppercase text-ink transition-colors hover:text-gold-deep py-4"
       >
         <span>{item.title}</span>
         {open ? (
@@ -103,7 +99,7 @@ function AccordionItem({
       </button>
       <div
         className={`overflow-hidden transition-all duration-300 ${
-          open ? "max-h-[1400px] pb-8 opacity-100" : "max-h-0 opacity-0"
+          open ? "max-h-[1400px] pb-6 opacity-100" : "max-h-0 opacity-0"
         }`}
       >
         {children}
@@ -608,7 +604,9 @@ function NotesSection({ product }: SectionRenderContext) {
 function AccordionSection({
   id,
   product,
-}: SectionRenderContext & { id: ProductAccordion["id"] }) {
+  isFirstAccordion,
+}: SectionRenderContext & { id: ProductAccordion["id"]; isFirstAccordion?: boolean }) {
+  if (id === "legal") return null;
   const item = productPageSettings.accordions.find((accordion) => accordion.id === id);
   if (!item?.visible) return null;
 
@@ -616,18 +614,17 @@ function AccordionSection({
     description: product.description,
     features: product.key_features,
     apply: product.how_to_apply,
-    legal: product.legal_information,
   };
 
   const fallback = fallbackById[id];
   if (!fallback && !item.content && !item.html && !item.bullets?.length) return null;
 
   return (
-    <SectionShell>
+    <div className={`w-full border-b border-border-light ${isFirstAccordion ? "mt-12 border-t" : ""}`}>
       <AccordionItem item={item}>
         <RichContent item={item} fallback={fallback} />
       </AccordionItem>
-    </SectionShell>
+    </div>
   );
 }
 
@@ -665,7 +662,7 @@ function RelatedProducts({ relatedProducts }: SectionRenderContext) {
   );
 }
 
-function renderSection(id: ProductPageSectionId, context: SectionRenderContext) {
+function renderSection(id: ProductPageSectionId, context: SectionRenderContext, isFirstAccordion?: boolean) {
   if (!productPageSettings.sections[id]?.visible) return null;
 
   switch (id) {
@@ -679,8 +676,9 @@ function renderSection(id: ProductPageSectionId, context: SectionRenderContext) 
     case "features":
     case "apply":
     case "ingredients":
+      return <AccordionSection key={id} id={id} {...context} isFirstAccordion={isFirstAccordion} />;
     case "legal":
-      return <AccordionSection key={id} id={id} {...context} />;
+      return null;
     case "reviews":
       return <ReviewsSection key={id} {...context} />;
     case "related":
@@ -911,7 +909,20 @@ export function ProductPage() {
           {heroIds.map((id) => renderSection(id, context))}
         </div>
 
-        {bodyIds.map((id) => renderSection(id, context))}
+        {(() => {
+          let hasRenderedAccordionHeader = false;
+          return bodyIds.map((id) => {
+            const isAccordion = id === "description" || id === "features" || id === "apply" || id === "ingredients";
+            let isFirst = false;
+            if (isAccordion) {
+              if (!hasRenderedAccordionHeader) {
+                isFirst = true;
+                hasRenderedAccordionHeader = true;
+              }
+            }
+            return renderSection(id, context, isFirst);
+          });
+        })()}
       </main>
     </ShopLayout>
   );
